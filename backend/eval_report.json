@@ -1,0 +1,367 @@
+{
+  "model": "llama-3.3-70b-versatile",
+  "total_tests": 30,
+  "passed": 28,
+  "failed": 2,
+  "errors": 0,
+  "accuracy_pct": 93.33,
+  "category_stats": {
+    "Basic": {
+      "pass": 3,
+      "fail": 0,
+      "error": 0
+    },
+    "Filtering": {
+      "pass": 3,
+      "fail": 0,
+      "error": 0
+    },
+    "GroupBy": {
+      "pass": 3,
+      "fail": 0,
+      "error": 0
+    },
+    "DateTime": {
+      "pass": 3,
+      "fail": 0,
+      "error": 0
+    },
+    "Percentage": {
+      "pass": 3,
+      "fail": 0,
+      "error": 0
+    },
+    "MultiCondition": {
+      "pass": 2,
+      "fail": 1,
+      "error": 0
+    },
+    "Having": {
+      "pass": 1,
+      "fail": 1,
+      "error": 0
+    },
+    "CrossColumn": {
+      "pass": 2,
+      "fail": 0,
+      "error": 0
+    },
+    "Ranking": {
+      "pass": 3,
+      "fail": 0,
+      "error": 0
+    },
+    "NullHandling": {
+      "pass": 1,
+      "fail": 0,
+      "error": 0
+    },
+    "Novel": {
+      "pass": 4,
+      "fail": 0,
+      "error": 0
+    }
+  },
+  "details": [
+    {
+      "id": "T01",
+      "question": "How many total transactions are there?",
+      "gold_sql": "SELECT COUNT(*) as total FROM transactions",
+      "category": "Basic",
+      "status": "PASS",
+      "gen_sql": "SELECT COUNT(*) as total_transactions FROM transactions",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T02",
+      "question": "What is the total amount of all successful transactions?",
+      "gold_sql": "SELECT SUM(amount_inr) as total FROM transactions WHERE transaction_status = 'SUCCESS'",
+      "category": "Basic",
+      "status": "PASS",
+      "gen_sql": "SELECT SUM(amount_inr) AS total_amount FROM transactions WHERE transaction_status = 'SUCCESS'",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T03",
+      "question": "How many distinct banks are there?",
+      "gold_sql": "SELECT COUNT(DISTINCT sender_bank) as bank_count FROM transactions",
+      "category": "Basic",
+      "status": "PASS",
+      "gen_sql": "SELECT COUNT(DISTINCT sender_bank) FROM transactions",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T04",
+      "question": "How many transactions were made using iOS devices?",
+      "gold_sql": "SELECT COUNT(*) as ios_count FROM transactions WHERE device_type = 'iOS'",
+      "category": "Filtering",
+      "status": "PASS",
+      "gen_sql": "SELECT COUNT(*) as ios_txns FROM transactions WHERE device_type = 'iOS'",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T05",
+      "question": "What is the average amount of failed transactions?",
+      "gold_sql": "SELECT AVG(amount_inr) as avg_failed FROM transactions WHERE transaction_status = 'FAILED'",
+      "category": "Filtering",
+      "status": "PASS",
+      "gen_sql": "SELECT AVG(amount_inr) FROM transactions WHERE transaction_status = 'FAILED'",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T06",
+      "question": "How many fraud transactions happened on weekdays?",
+      "gold_sql": "SELECT COUNT(*) as count FROM transactions WHERE fraud_flag = 1 AND is_weekend = 0",
+      "category": "Filtering",
+      "status": "PASS",
+      "gen_sql": "SELECT COUNT(*) as fraud_count FROM transactions WHERE fraud_flag = 1 AND is_weekend = 0",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T07",
+      "question": "How many transactions per device type?",
+      "gold_sql": "SELECT device_type, COUNT(*) as count FROM transactions GROUP BY device_type",
+      "category": "GroupBy",
+      "status": "PASS",
+      "gen_sql": "SELECT device_type, COUNT(*) as txn_count FROM transactions GROUP BY device_type",
+      "gold_rows": 3,
+      "gen_rows": 3
+    },
+    {
+      "id": "T08",
+      "question": "What is the total transaction amount per bank?",
+      "gold_sql": "SELECT sender_bank, SUM(amount_inr) as total FROM transactions GROUP BY sender_bank ORDER BY total DESC",
+      "category": "GroupBy",
+      "status": "PASS",
+      "gen_sql": "SELECT sender_bank, SUM(amount_inr) as total_amount FROM transactions GROUP BY sender_bank",
+      "gold_rows": 8,
+      "gen_rows": 8
+    },
+    {
+      "id": "T09",
+      "question": "Show the number of transactions per transaction type.",
+      "gold_sql": "SELECT transaction_type, COUNT(*) as count FROM transactions GROUP BY transaction_type",
+      "category": "GroupBy",
+      "status": "PASS",
+      "gen_sql": "SELECT transaction_type, COUNT(*) as txn_count FROM transactions GROUP BY transaction_type",
+      "gold_rows": 4,
+      "gen_rows": 4
+    },
+    {
+      "id": "T10",
+      "question": "How many transactions happened in March?",
+      "gold_sql": "SELECT COUNT(*) as count FROM transactions WHERE strftime('%m', timestamp) = '03'",
+      "category": "DateTime",
+      "status": "PASS",
+      "gen_sql": "SELECT COUNT(*) as txn_count FROM transactions WHERE SUBSTR(timestamp, 6, 2) = '03'",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T11",
+      "question": "Show the total amount per month.",
+      "gold_sql": "SELECT strftime('%Y-%m', timestamp) as month, SUM(amount_inr) as total FROM transactions GROUP BY month ORDER BY month",
+      "category": "DateTime",
+      "status": "PASS",
+      "gen_sql": "SELECT STRFTIME('%Y-%m', timestamp) AS month, SUM(amount_inr) as total_amount FROM transactions GROUP BY month ORDER BY month",
+      "gold_rows": 12,
+      "gen_rows": 12
+    },
+    {
+      "id": "T12",
+      "question": "Which day of the week has the most transactions?",
+      "gold_sql": "SELECT day_of_week, COUNT(*) as count FROM transactions GROUP BY day_of_week ORDER BY count DESC LIMIT 1",
+      "category": "DateTime",
+      "status": "PASS",
+      "gen_sql": "SELECT day_of_week, COUNT(*) as txn_count FROM transactions GROUP BY day_of_week ORDER BY txn_count DESC LIMIT 1",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T13",
+      "question": "What is the overall fraud rate?",
+      "gold_sql": "SELECT (SUM(fraud_flag) * 100.0 / COUNT(*)) as fraud_rate FROM transactions",
+      "category": "Percentage",
+      "status": "PASS",
+      "gen_sql": "SELECT (SUM(fraud_flag) * 100.0 / COUNT(*)) AS overall_fraud_rate FROM transactions",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T14",
+      "question": "What is the success rate per network type?",
+      "gold_sql": "SELECT network_type, (SUM(CASE WHEN transaction_status = 'SUCCESS' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as success_rate FROM transactions GROUP BY network_type",
+      "category": "Percentage",
+      "status": "PASS",
+      "gen_sql": "SELECT network_type, (SUM(CASE WHEN transaction_status = 'SUCCESS' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as success_rate FROM transactions GROUP BY network_type",
+      "gold_rows": 4,
+      "gen_rows": 4
+    },
+    {
+      "id": "T15",
+      "question": "What percentage of transactions are P2P?",
+      "gold_sql": "SELECT (COUNT(*) * 100.0 / (SELECT COUNT(*) FROM transactions)) as p2p_pct FROM transactions WHERE transaction_type = 'P2P'",
+      "category": "Percentage",
+      "status": "PASS",
+      "gen_sql": "SELECT (SUM(CASE WHEN transaction_type = 'P2P' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as p2p_percentage FROM transactions",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T16",
+      "question": "How many large successful P2P transactions are there?",
+      "gold_sql": "SELECT COUNT(*) as count FROM transactions WHERE transaction_type = 'P2P' AND amount_tier = 'Large' AND transaction_status = 'SUCCESS'",
+      "category": "MultiCondition",
+      "status": "PASS",
+      "gen_sql": "SELECT COUNT(*) as large_p2p_txns FROM transactions WHERE transaction_type = 'P2P' AND amount_tier = 'Large' AND transaction_status = 'SUCCESS'",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T17",
+      "question": "Show failed Recharge transactions on WiFi.",
+      "gold_sql": "SELECT transaction_id, amount_inr, sender_bank FROM transactions WHERE transaction_type = 'Recharge' AND transaction_status = 'FAILED' AND network_type = 'WiFi'",
+      "category": "MultiCondition",
+      "status": "FAIL",
+      "gen_sql": "SELECT * FROM transactions WHERE transaction_type = 'Recharge' AND network_type = 'WiFi' AND transaction_status = 'FAILED'",
+      "gold_rows": 46,
+      "gen_rows": 46
+    },
+    {
+      "id": "T18",
+      "question": "Average amount of fraud transactions from Karnataka on 4G?",
+      "gold_sql": "SELECT AVG(amount_inr) as avg_amount FROM transactions WHERE fraud_flag = 1 AND sender_state = 'Karnataka' AND network_type = '4G'",
+      "category": "MultiCondition",
+      "status": "PASS",
+      "gen_sql": "SELECT AVG(amount_inr) FROM transactions WHERE sender_state = 'Karnataka' AND network_type = '4G' AND fraud_flag = 1",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T19",
+      "question": "Which merchant categories have more than 5000 transactions?",
+      "gold_sql": "SELECT merchant_category, COUNT(*) as count FROM transactions WHERE merchant_category IS NOT NULL GROUP BY merchant_category HAVING COUNT(*) > 5000",
+      "category": "Having",
+      "status": "FAIL",
+      "gen_sql": "SELECT merchant_category, COUNT(*) as txn_count FROM transactions WHERE transaction_type != 'P2P' GROUP BY merchant_category HAVING COUNT(*) > 5000",
+      "gold_rows": 10,
+      "gen_rows": 9
+    },
+    {
+      "id": "T20",
+      "question": "Which banks have a failure rate above 10%?",
+      "gold_sql": "SELECT sender_bank, (SUM(CASE WHEN transaction_status = 'FAILED' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as failure_rate FROM transactions GROUP BY sender_bank HAVING failure_rate > 10",
+      "category": "Having",
+      "status": "PASS",
+      "gen_sql": "SELECT sender_bank, (SUM(CASE WHEN transaction_status = 'FAILED' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as failure_rate FROM transactions GROUP BY sender_bank HAVING (SUM(CASE WHEN transaction_status = 'FAILED' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) > 10",
+      "gold_rows": 0,
+      "gen_rows": 0
+    },
+    {
+      "id": "T21",
+      "question": "What is the fraud rate per age group?",
+      "gold_sql": "SELECT sender_age_label, (SUM(fraud_flag) * 100.0 / COUNT(*)) as fraud_rate FROM transactions GROUP BY sender_age_label",
+      "category": "CrossColumn",
+      "status": "PASS",
+      "gen_sql": "SELECT sender_age_label, (SUM(fraud_flag) * 100.0 / COUNT(*)) as fraud_rate FROM transactions GROUP BY sender_age_label",
+      "gold_rows": 3,
+      "gen_rows": 3
+    },
+    {
+      "id": "T22",
+      "question": "Show transaction count by state and transaction type.",
+      "gold_sql": "SELECT sender_state, transaction_type, COUNT(*) as count FROM transactions GROUP BY sender_state, transaction_type ORDER BY sender_state, count DESC",
+      "category": "CrossColumn",
+      "status": "PASS",
+      "gen_sql": "SELECT sender_state, transaction_type, COUNT(*) as txn_count FROM transactions GROUP BY sender_state, transaction_type ORDER BY sender_state, txn_count DESC",
+      "gold_rows": 40,
+      "gen_rows": 40
+    },
+    {
+      "id": "T23",
+      "question": "Which state has the most transactions?",
+      "gold_sql": "SELECT sender_state, COUNT(*) as count FROM transactions GROUP BY sender_state ORDER BY count DESC LIMIT 1",
+      "category": "Ranking",
+      "status": "PASS",
+      "gen_sql": "SELECT sender_state, COUNT(*) as txn_count FROM transactions GROUP BY sender_state ORDER BY txn_count DESC LIMIT 1",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T24",
+      "question": "Top 5 banks by average transaction amount.",
+      "gold_sql": "SELECT sender_bank, AVG(amount_inr) as avg_amount FROM transactions GROUP BY sender_bank ORDER BY avg_amount DESC LIMIT 5",
+      "category": "Ranking",
+      "status": "PASS",
+      "gen_sql": "SELECT sender_bank, AVG(amount_inr) as avg_amount FROM transactions GROUP BY sender_bank ORDER BY avg_amount DESC LIMIT 5",
+      "gold_rows": 5,
+      "gen_rows": 5
+    },
+    {
+      "id": "T25",
+      "question": "Show the 3 least common merchant categories.",
+      "gold_sql": "SELECT merchant_category, COUNT(*) as count FROM transactions WHERE merchant_category IS NOT NULL GROUP BY merchant_category ORDER BY count ASC LIMIT 3",
+      "category": "Ranking",
+      "status": "PASS",
+      "gen_sql": "SELECT merchant_category, COUNT(*) as count FROM transactions WHERE merchant_category IS NOT NULL GROUP BY merchant_category ORDER BY count ASC LIMIT 3",
+      "gold_rows": 3,
+      "gen_rows": 3
+    },
+    {
+      "id": "T26",
+      "question": "Count transactions where merchant category is NULL.",
+      "gold_sql": "SELECT COUNT(*) as null_count FROM transactions WHERE merchant_category IS NULL",
+      "category": "NullHandling",
+      "status": "PASS",
+      "gen_sql": "SELECT COUNT(*) FROM transactions WHERE merchant_category IS NULL",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T27",
+      "question": "What is the average amount for each amount tier?",
+      "gold_sql": "SELECT amount_tier, AVG(amount_inr) as avg_amount FROM transactions GROUP BY amount_tier",
+      "category": "Novel",
+      "status": "PASS",
+      "gen_sql": "SELECT amount_tier, AVG(amount_inr) as avg_amount FROM transactions GROUP BY amount_tier",
+      "gold_rows": 3,
+      "gen_rows": 3
+    },
+    {
+      "id": "T28",
+      "question": "How does the failure rate change by hour of day?",
+      "gold_sql": "SELECT hour_of_day, (SUM(CASE WHEN transaction_status = 'FAILED' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as failure_rate FROM transactions GROUP BY hour_of_day ORDER BY hour_of_day",
+      "category": "Novel",
+      "status": "PASS",
+      "gen_sql": "SELECT hour_of_day, (SUM(CASE WHEN transaction_status = 'FAILED' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as failure_rate FROM transactions GROUP BY hour_of_day ORDER BY hour_of_day",
+      "gold_rows": 24,
+      "gen_rows": 24
+    },
+    {
+      "id": "T29",
+      "question": "What is the ratio of P2P to P2M transactions?",
+      "gold_sql": "SELECT (SELECT COUNT(*) FROM transactions WHERE transaction_type = 'P2P') * 1.0 / (SELECT COUNT(*) FROM transactions WHERE transaction_type = 'P2M') as p2p_to_p2m_ratio",
+      "category": "Novel",
+      "status": "PASS",
+      "gen_sql": "SELECT (SUM(CASE WHEN transaction_type = 'P2P' THEN 1 ELSE 0 END) * 1.0) / (SUM(CASE WHEN transaction_type = 'P2M' THEN 1 ELSE 0 END) * 1.0) as p2p_to_p2m_ratio FROM transactions",
+      "gold_rows": 1,
+      "gen_rows": 1
+    },
+    {
+      "id": "T30",
+      "question": "Show the overall transaction summary: total count, total amount, average amount, fraud count, and failure count.",
+      "gold_sql": "SELECT COUNT(*) as total_txns, SUM(amount_inr) as total_amount, AVG(amount_inr) as avg_amount, SUM(fraud_flag) as fraud_count, SUM(CASE WHEN transaction_status = 'FAILED' THEN 1 ELSE 0 END) as failure_count FROM transactions",
+      "category": "Novel",
+      "status": "PASS",
+      "gen_sql": "SELECT \n    COUNT(*) as total_count,\n    SUM(amount_inr) as total_amount,\n    AVG(amount_inr) as avg_amount,\n    SUM(fraud_flag) as fraud_count,\n    SUM(CASE WHEN transaction_status = 'FAILED' THEN 1 ELSE 0 END) as failure_count\nFROM transactions",
+      "gold_rows": 1,
+      "gen_rows": 1
+    }
+  ]
+}

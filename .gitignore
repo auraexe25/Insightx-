@@ -1,4 +1,9 @@
-# Byte-compiled / optimized / DLL files
+# Backend Data and Vector Stores
+backend/data/
+backend/vector_store/
+
+# Python Cache & Environments
+backend/__pycache__/
 __pycache__/
 *.py[codz]
 *$py.class
