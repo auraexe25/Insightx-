@@ -12,7 +12,13 @@ No external Vanna API key needed — all training data lives in local ChromaDB.
 import json
 import os
 import tempfile
+import sys
 import traceback
+
+# Add scripts directory to path to import EasyOCRModel
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+sys.path.append(os.path.join(PROJECT_ROOT, "scripts"))
 
 import numpy as np
 import pandas as pd
@@ -26,6 +32,12 @@ from openai import OpenAI
 from pydantic import BaseModel
 from vanna.legacy.chromadb.chromadb_vector import ChromaDB_VectorStore
 from vanna.legacy.openai.openai_chat import OpenAI_Chat
+
+try:
+    from ocr_easyocr import EasyOCRModel
+except ImportError:
+    print("[!] Could not import EasyOCRModel. Make sure easyocr is installed.")
+    EasyOCRModel = None
 
 # ── Path Resolution ──────────────────────────────────────────────────────────
 
@@ -77,6 +89,16 @@ WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
 print(f"Loading Whisper '{WHISPER_MODEL_NAME}' model...")
 whisper_model = whisper.load_model(WHISPER_MODEL_NAME)
 print(f"[✓] Whisper STT initialized (model: {WHISPER_MODEL_NAME})")
+
+# ── OCR Model (EasyOCR) ──────────────────────────────────────────────────────
+
+print("Loading EasyOCR model...")
+try:
+    ocr_model = EasyOCRModel(languages=['en'], gpu=False)  # CPU by default for safety
+    print("[✓] EasyOCR initialized")
+except Exception as e:
+    print(f"[!] OCR Init Failed: {e}")
+    ocr_model = None
 
 
 # ── FastAPI App ──────────────────────────────────────────────────────────────
@@ -260,6 +282,71 @@ async def voice_ask(audio: UploadFile = File(...)):
     # Step 3: Return combined response
     pipeline_result["transcription"] = transcription
     return pipeline_result
+
+
+# ── OCR / Image Endpoint ─────────────────────────────────────────────────────
+
+@app.post("/api/ocr-ask")
+async def ocr_ask(image: UploadFile = File(...)):
+    """
+    Accepts an image upload → Extracts text (OCR) → Formulates Question (Groq)
+    → Runs Vanna Pipeline.
+    """
+    if ocr_model is None:
+        raise HTTPException(status_code=503, detail="OCR service is not available.")
+
+    ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp"}
+    if image.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported image type: {image.content_type}")
+
+    try:
+        # 1. Save temp file
+        suffix = os.path.splitext(image.filename)[1] or ".jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            contents = await image.read()
+            tmp.write(contents)
+            tmp_path = tmp.name
+
+        # 2. Extract Text via OCR
+        print(f"Running OCR on {tmp_path}...")
+        extracted_text = ocr_model.extract_text(tmp_path)
+        os.unlink(tmp_path)  # Cleanup
+
+        if not extracted_text or len(extracted_text.strip()) < 5:
+            raise HTTPException(status_code=400, detail="No readable text found in the image.")
+
+        print(f"OCR Extracted: {extracted_text[:100]}...")
+
+        # 3. Interpret Text -> Question (Groq)
+        interpretation_prompt = (
+            f"I have extracted the following text from an image (chart, report, or screenshot):\n"
+            f"\"\"\"{extracted_text}\"\"\"\n\n"
+            f"Based on this text, formulate a single, clear, and specific business question "
+            f"that can be answered by querying the 'upi_transactions' database.\n"
+            f"Return ONLY the question, nothing else."
+        )
+
+        groq_resp = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": interpretation_prompt}],
+            temperature=0.3,
+            max_tokens=100,
+        )
+        formulated_question = groq_resp.choices[0].message.content.strip()
+        print(f"Formulated Question: {formulated_question}")
+
+        # 4. Run Vanna Pipeline
+        pipeline_result = await ask_insightx(QueryRequest(question=formulated_question))
+
+        # 5. Add metadata
+        pipeline_result["ocr_text"] = extracted_text
+        pipeline_result["original_question"] = formulated_question  # The question derived from OCR
+
+        return pipeline_result
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"OCR pipeline failed: {str(e)}")
 
 
 # ── Health Check ─────────────────────────────────────────────────────────────
