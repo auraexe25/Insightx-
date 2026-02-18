@@ -8,10 +8,10 @@ InsightX lets you ask questions in plain English and get instant insights — po
 
 ## ✨ Features
 
-- 🎤 **Speech-to-Text**: Convert voice to queries using OpenAI Whisper (runs locally, no API needed)
-- 🤖 **Text-to-SQL**: Natural language → SQL using Vanna AI with local ChromaDB
-- 💡 **Smart Analytics**: AI-powered insights and follow-up suggestions via Groq LLM
-- 📊 **Real-time Execution**: Execute queries against local SQLite database instantly
+- 👁️ **OCR / Image Analysis**: Extract text from images (charts, reports) and query data based on it.
+- 🎤 **Voice-to-SQL**: Full voice interaction pipeline (Speak → Text → SQL → Answer).
+- 💡 **Smart Analytics**: AI-powered insights and follow-up suggestions via Groq LLM.
+- 📊 **Real-time Execution**: Execute queries against local SQLite database instantly.
 - 🎯 **No External Dependencies**: All ML models run locally (Whisper, ChromaDB, Groq)
 - 🔄 **Dual-AI Pipeline**: Combines Text-to-SQL + LLM synthesis for comprehensive answers
 
@@ -28,7 +28,8 @@ Insightx-/
 │   │   ├── train_vanna.py             # Train Vanna on DB schema & examples
 │   │   ├── demo_vanna.py              # CLI demo for testing Vanna queries
 │   │   ├── evaluate_vanna.py          # Evaluation script
-│   │   └── speech_to_text.py          # Voice-to-text using Whisper (local)
+│   │   ├── speech_to_text.py          # Voice-to-text using Whisper (local)
+│   │   └── ocr_easyocr.py             # OCR using EasyOCR (local)
 │   ├── data/                          # SQLite DB + CSV datasets (git-ignored)
 │   ├── vector_store/                  # ChromaDB vector embeddings (git-ignored)
 │   ├── notebooks/
@@ -78,7 +79,14 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 The API will be available at: **http://localhost:8000**
 
-### 6. Test the API
+### 6. Start the Frontend (UI)
+```bash
+cd frontend
+chainlit run app.py -w --port 8002
+```
+The UI will be available at: **http://localhost:8002**
+
+### 7. Test the API
 ```bash
 curl -X POST http://localhost:8000/api/ask \
   -H "Content-Type: application/json" \
@@ -123,6 +131,20 @@ Or use the interactive docs at: **http://localhost:8000/docs**
 }
 ```
 
+### Voice Query
+**`POST /api/voice-ask`**
+- Accepts audio file upload (`.wav`, `.webm`, `.mp3`).
+- Transcribes audio locally using Whisper.
+- Executes the full analysis pipeline.
+- **Request**: `multipart/form-data` with `audio` file.
+
+### OCR / Image Query
+**`POST /api/ocr-ask`**
+- Accepts image file upload (`.jpg`, `.png`).
+- Optional `text` field for specific user instructions.
+- Extracts text → Interprets with Groq → Generates SQL.
+- **Request**: `multipart/form-data` with `image` file and optional `text` string.
+
 ## Tech Stack
 
 - **FastAPI** — High-performance async API framework
@@ -130,6 +152,7 @@ Or use the interactive docs at: **http://localhost:8000/docs**
 - **Groq LLaMA 3.3 70B** — Open-source LLM for SQL generation & summaries
 - **ChromaDB** — Vector database for semantic search
 - **SQLite** — Embedded database for UPI transactions
+- **EasyOCR** — Optical Character Recognition for images
 - **OpenAI Whisper** — Local speech recognition (no API key required)
 - **SoundDevice** — Microphone audio capture
 - **Pandas** — Data processing and transformation
@@ -168,6 +191,16 @@ python scripts/speech_to_text.py
 - No API key required — runs entirely locally
 - Configurable recording duration
 - Returns transcribed text ready for SQL generation
+
+### `ocr_easyocr.py` (NEW)
+Extract text from images using EasyOCR:
+```bash
+python scripts/ocr_easyocr.py path/to/image.png --detailed
+```
+**Features:**
+- Runs locally (CPU/GPU)
+- Preprocessing for rotation and contrast
+- Outputs raw text or JSON with confidence scores
 
 ## Architecture
 

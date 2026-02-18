@@ -25,8 +25,9 @@ import pandas as pd
 import uvicorn
 import whisper  # type: ignore  # Package: openai-whisper
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from groq import Groq
 from openai import OpenAI
 from pydantic import BaseModel
@@ -287,9 +288,12 @@ async def voice_ask(audio: UploadFile = File(...)):
 # ── OCR / Image Endpoint ─────────────────────────────────────────────────────
 
 @app.post("/api/ocr-ask")
-async def ocr_ask(image: UploadFile = File(...)):
+async def ocr_ask(
+    image: UploadFile = File(...),
+    text: Optional[str] = Form(None)
+):
     """
-    Accepts an image upload → Extracts text (OCR) → Formulates Question (Groq)
+    Accepts an image upload + optional text → Extracts text (OCR) → Formulates Question (Groq)
     → Runs Vanna Pipeline.
     """
     if ocr_model is None:
@@ -318,13 +322,25 @@ async def ocr_ask(image: UploadFile = File(...)):
         print(f"OCR Extracted: {extracted_text[:100]}...")
 
         # 3. Interpret Text -> Question (Groq)
-        interpretation_prompt = (
+        base_prompt = (
             f"I have extracted the following text from an image (chart, report, or screenshot):\n"
-            f"\"\"\"{extracted_text}\"\"\"\n\n"
-            f"Based on this text, formulate a single, clear, and specific business question "
-            f"that can be answered by querying the 'upi_transactions' database.\n"
-            f"Return ONLY the question, nothing else."
+            f"\"\"\"{extracted_text}\"\"\"\n"
         )
+
+        if text and text.strip():
+            base_prompt += f"\nThe user also provided this specific note/question: \"{text}\"\n"
+            task_instruction = (
+                "Task: Combine the image text and the user's note to formulate a single, clear, "
+                "and specific business question that can be answered by querying the 'upi_transactions' database.\n"
+                "Prioritize the user's note if it refines the context."
+            )
+        else:
+            task_instruction = (
+                "Task: Based on this text, formulate a single, clear, and specific business question "
+                "that can be answered by querying the 'upi_transactions' database."
+            )
+
+        interpretation_prompt = f"{base_prompt}\n{task_instruction}\nReturn ONLY the question, nothing else."
 
         groq_resp = groq_client.chat.completions.create(
             model=GROQ_MODEL,
