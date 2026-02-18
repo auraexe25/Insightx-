@@ -11,12 +11,15 @@ No external Vanna API key needed — all training data lives in local ChromaDB.
 
 import json
 import os
+import tempfile
 import traceback
 
+import numpy as np
 import pandas as pd
 import uvicorn
+import whisper  # type: ignore  # Package: openai-whisper
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 from openai import OpenAI
@@ -67,6 +70,13 @@ print(f"[✓] Connected to SQLite: {DB_PATH}")
 # Groq native client for answer synthesis
 groq_client = Groq(api_key=GROQ_API_KEY)
 print(f"[✓] Groq LLM initialized (model: {GROQ_MODEL})")
+
+# ── Whisper STT Model ────────────────────────────────────────────────────────
+
+WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
+print(f"Loading Whisper '{WHISPER_MODEL_NAME}' model...")
+whisper_model = whisper.load_model(WHISPER_MODEL_NAME)
+print(f"[✓] Whisper STT initialized (model: {WHISPER_MODEL_NAME})")
 
 
 # ── FastAPI App ──────────────────────────────────────────────────────────────
@@ -185,6 +195,71 @@ async def ask_insightx(request: QueryRequest):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Speech-to-Text Endpoint ──────────────────────────────────────────────────
+
+@app.post("/api/transcribe")
+async def transcribe_audio(audio: UploadFile = File(...)):
+    """
+    Accepts an audio file upload (wav, webm, mp3, ogg, m4a) and returns
+    the transcribed text using local Whisper.
+    """
+    ALLOWED_TYPES = {
+        "audio/wav", "audio/x-wav", "audio/wave",
+        "audio/webm", "audio/ogg", "audio/mpeg", "audio/mp3",
+        "audio/mp4", "audio/x-m4a", "audio/aac",
+        "video/webm",  # browsers often send webm as video/webm
+    }
+
+    if audio.content_type and audio.content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio type: {audio.content_type}. "
+                   f"Accepted: wav, webm, mp3, ogg, m4a.",
+        )
+
+    try:
+        # Save uploaded audio to a temp file (Whisper needs a file path)
+        suffix = ".webm"  # safe default; Whisper/ffmpeg auto-detects format
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            contents = await audio.read()
+            tmp.write(contents)
+            tmp_path = tmp.name
+
+        # Transcribe
+        result = whisper_model.transcribe(tmp_path)
+        transcription = result["text"].strip()
+
+        # Cleanup
+        os.unlink(tmp_path)
+
+        return {"transcription": transcription}
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+
+@app.post("/api/voice-ask")
+async def voice_ask(audio: UploadFile = File(...)):
+    """
+    Combined endpoint: Transcribe audio → run the full Dual-AI Pipeline.
+    Returns transcription + executive summary + follow-ups in one request.
+    """
+    # Step 1: Transcribe
+    transcription_response = await transcribe_audio(audio)
+    transcription = transcription_response["transcription"]
+
+    if not transcription:
+        raise HTTPException(status_code=400, detail="Could not transcribe any speech from the audio.")
+
+    # Step 2: Run through the existing pipeline
+    pipeline_result = await ask_insightx(QueryRequest(question=transcription))
+
+    # Step 3: Return combined response
+    pipeline_result["transcription"] = transcription
+    return pipeline_result
 
 
 # ── Health Check ─────────────────────────────────────────────────────────────
