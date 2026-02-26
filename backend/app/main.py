@@ -1,18 +1,22 @@
-"""
-app/main.py — InsightX Agentic API (Dual-AI Pipeline).
+﻿"""
+app/main.py â€” InsightX Agentic API (Dual-AI Pipeline).
 
 Pipeline:
-  User Question → Vanna AI (Local ChromaDB + Groq LLM for SQL)
-  → Groq LLM (Executive Summary + Follow-ups)
-  → Unified JSON Response
+  User Question â†’ Vanna AI (Local ChromaDB + Groq LLM for SQL)
+  â†’ Groq LLM (Executive Summary + Follow-ups)
+  â†’ Unified JSON Response
 
-No external Vanna API key needed — all training data lives in local ChromaDB.
+No external Vanna API key needed â€” all training data lives in local ChromaDB.
 """
 
 import json
 import os
 import tempfile
 import sys
+
+# Force UTF-8 stdout so unicode print statements work on Windows terminals
+sys.stdout.reconfigure(encoding="utf-8")
+
 import traceback
 
 # Add scripts directory to path to import EasyOCRModel
@@ -40,14 +44,14 @@ except ImportError:
     print("[!] Could not import EasyOCRModel. Make sure easyocr is installed.")
     EasyOCRModel = None
 
-# ── Path Resolution ──────────────────────────────────────────────────────────
+# â”€â”€ Path Resolution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
 DB_PATH = os.path.join(PROJECT_ROOT, "data", "upi_transactions.db")
 VECTOR_STORE_PATH = os.path.join(PROJECT_ROOT, "vector_store")
 
-# ── Load Environment Variables ───────────────────────────────────────────────
+# â”€â”€ Load Environment Variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
@@ -58,7 +62,7 @@ if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY not found. Create a .env file in backend/ (see .env.example).")
 
 
-# ── Vanna AI — Local ChromaDB + Groq (OpenAI-compatible) ────────────────────
+# â”€â”€ Vanna AI â€” Local ChromaDB + Groq (OpenAI-compatible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class MyVanna(ChromaDB_VectorStore, OpenAI_Chat):
     def __init__(self, client=None, config=None):
@@ -77,32 +81,32 @@ vn = MyVanna(client=vanna_client, config={
     "path": VECTOR_STORE_PATH,
 })
 vn.connect_to_sqlite(DB_PATH)
-print(f"[✓] Vanna AI initialized (local ChromaDB: {VECTOR_STORE_PATH})")
-print(f"[✓] Connected to SQLite: {DB_PATH}")
+print(f"[âœ“] Vanna AI initialized (local ChromaDB: {VECTOR_STORE_PATH})")
+print(f"[âœ“] Connected to SQLite: {DB_PATH}")
 
 # Groq native client for answer synthesis
 groq_client = Groq(api_key=GROQ_API_KEY)
-print(f"[✓] Groq LLM initialized (model: {GROQ_MODEL})")
+print(f"[âœ“] Groq LLM initialized (model: {GROQ_MODEL})")
 
-# ── Whisper STT Model ────────────────────────────────────────────────────────
+# â”€â”€ Whisper STT Model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
 print(f"Loading Whisper '{WHISPER_MODEL_NAME}' model...")
 whisper_model = whisper.load_model(WHISPER_MODEL_NAME)
-print(f"[✓] Whisper STT initialized (model: {WHISPER_MODEL_NAME})")
+print(f"[âœ“] Whisper STT initialized (model: {WHISPER_MODEL_NAME})")
 
-# ── OCR Model (EasyOCR) ──────────────────────────────────────────────────────
+# â”€â”€ OCR Model (EasyOCR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 print("Loading EasyOCR model...")
 try:
     ocr_model = EasyOCRModel(languages=['en'], gpu=False)  # CPU by default for safety
-    print("[✓] EasyOCR initialized")
+    print("[âœ“] EasyOCR initialized")
 except Exception as e:
     print(f"[!] OCR Init Failed: {e}")
     ocr_model = None
 
 
-# ── FastAPI App ──────────────────────────────────────────────────────────────
+# â”€â”€ FastAPI App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app = FastAPI(title="InsightX Agentic API")
 
@@ -114,13 +118,13 @@ app.add_middleware(
 )
 
 
-# ── Pydantic Models ──────────────────────────────────────────────────────────
+# â”€â”€ Pydantic Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class QueryRequest(BaseModel):
     question: str
 
 
-# ── Groq Synthesis Prompt ────────────────────────────────────────────────────
+# â”€â”€ Groq Synthesis Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 SYNTHESIS_PROMPT = """You are an elite data analyst for InsightX. \
 The user asked: "{question}". \
@@ -129,27 +133,27 @@ The database returned this exact data:
 
 Task 1: Write a concise, highly professional executive summary (2-3 sentences) of this data. \
 Highlight the most important business finding. Format it beautifully. \
-Include rupee symbols (₹) for currency.
+Include rupee symbols (â‚¹) for currency.
 Task 2: Suggest exactly 3 logical follow-up questions to dig deeper.
 
 You MUST return your response as a valid JSON object. \
 Use exactly these keys: "answer" (string) and "follow_up_questions" (list of strings)."""
 
 
-# ── Core Endpoint ────────────────────────────────────────────────────────────
+# â”€â”€ Core Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/api/ask")
 async def ask_insightx(request: QueryRequest):
     """
     Full Dual-AI Pipeline:
-      Question → Vanna (SQL + Data via local ChromaDB) → Groq (Summary + Follow-ups) → JSON
+      Question â†’ Vanna (SQL + Data via local ChromaDB) â†’ Groq (Summary + Follow-ups) â†’ JSON
     """
     try:
         question = request.question.strip()
         if not question:
             raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-        # ── Step A: Vanna AI — Generate SQL & Execute ────────────────────────
+        # â”€â”€ Step A: Vanna AI â€” Generate SQL & Execute â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         generated_sql = vn.generate_sql(question)
 
         if generated_sql is None or generated_sql.strip() == "":
@@ -162,7 +166,7 @@ async def ask_insightx(request: QueryRequest):
             except Exception:
                 df = None
 
-        # ── Step B: Data Formatting ──────────────────────────────────────────
+        # â”€â”€ Step B: Data Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             df_markdown = "No data found."
             data_dict = []
@@ -170,7 +174,7 @@ async def ask_insightx(request: QueryRequest):
             df_markdown = df.to_markdown(index=False)
             data_dict = df.fillna("None").to_dict(orient="records")
 
-        # ── Step C + D: Groq Synthesis ───────────────────────────────────────
+        # â”€â”€ Step C + D: Groq Synthesis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         prompt = SYNTHESIS_PROMPT.format(
             question=question,
             df_markdown=df_markdown,
@@ -188,7 +192,7 @@ async def ask_insightx(request: QueryRequest):
 
         raw_content = groq_response.choices[0].message.content.strip()
 
-        # ── Step E: Response Parsing ─────────────────────────────────────────
+        # â”€â”€ Step E: Response Parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         try:
             llm_result = json.loads(raw_content)
         except json.JSONDecodeError:
@@ -204,7 +208,7 @@ async def ask_insightx(request: QueryRequest):
         answer = llm_result.get("answer", raw_content)
         follow_ups = llm_result.get("follow_up_questions", [])[:3]
 
-        # ── Step F: Final Return ─────────────────────────────────────────────
+        # â”€â”€ Step F: Final Return â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         return {
             "question": question,
             "sql": generated_sql,
@@ -220,7 +224,7 @@ async def ask_insightx(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── Speech-to-Text Endpoint ──────────────────────────────────────────────────
+# â”€â”€ Speech-to-Text Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/api/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
@@ -267,7 +271,7 @@ async def transcribe_audio(audio: UploadFile = File(...)):
 @app.post("/api/voice-ask")
 async def voice_ask(audio: UploadFile = File(...)):
     """
-    Combined endpoint: Transcribe audio → run the full Dual-AI Pipeline.
+    Combined endpoint: Transcribe audio â†’ run the full Dual-AI Pipeline.
     Returns transcription + executive summary + follow-ups in one request.
     """
     # Step 1: Transcribe
@@ -285,7 +289,7 @@ async def voice_ask(audio: UploadFile = File(...)):
     return pipeline_result
 
 
-# ── OCR / Image Endpoint ─────────────────────────────────────────────────────
+# â”€â”€ OCR / Image Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/api/ocr-ask")
 async def ocr_ask(
@@ -293,8 +297,8 @@ async def ocr_ask(
     text: Optional[str] = Form(None)
 ):
     """
-    Accepts an image upload + optional text → Extracts text (OCR) → Formulates Question (Groq)
-    → Runs Vanna Pipeline.
+    Accepts an image upload + optional text â†’ Extracts text (OCR) â†’ Formulates Question (Groq)
+    â†’ Runs Vanna Pipeline.
     """
     if ocr_model is None:
         raise HTTPException(status_code=503, detail="OCR service is not available.")
@@ -365,15 +369,15 @@ async def ocr_ask(
         raise HTTPException(status_code=500, detail=f"OCR pipeline failed: {str(e)}")
 
 
-# ── Health Check ─────────────────────────────────────────────────────────────
+# â”€â”€ Health Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.get("/")
 async def health_check():
     return {"status": "ok", "service": "InsightX Agentic API"}
 
 
-# ── Run ──────────────────────────────────────────────────────────────────────
+# â”€â”€ Run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 if __name__ == "__main__":
-    print("[✓] Starting InsightX Agentic API on http://localhost:8000")
+    print("[âœ“] Starting InsightX Agentic API on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

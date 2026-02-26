@@ -22,7 +22,12 @@ export interface Message {
     rows?: string[][];
     // Text
     content?: string;
+    // SQL (collapsible detail)
+    sql?: string;
+    // Follow-up questions
+    followUpQuestions?: string[];
   };
+  onFollowUp?: (question: string) => void;
 }
 
 interface ChatMessageProps {
@@ -81,6 +86,34 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
                   <p className="text-sm text-muted-foreground pt-2 border-t border-border/30">
                     {message.data.summary}
                   </p>
+                )}
+                {/* Follow-up questions */}
+                {message.data.followUpQuestions && message.data.followUpQuestions.length > 0 && (
+                  <div className="pt-2 border-t border-border/30">
+                    <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Suggested follow-ups</p>
+                    <div className="flex flex-wrap gap-2">
+                      {message.data.followUpQuestions.map((q) => (
+                        <button
+                          key={q}
+                          onClick={() => message.onFollowUp?.(q)}
+                          className="px-3 py-1.5 rounded-lg text-xs border border-border/50 bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all text-left"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* SQL Disclosure */}
+                {message.data.sql && (
+                  <details className="pt-1">
+                    <summary className="text-xs text-muted-foreground/60 cursor-pointer hover:text-muted-foreground transition-colors">
+                      View SQL
+                    </summary>
+                    <pre className="mt-2 text-xs bg-secondary/40 rounded-lg p-3 overflow-x-auto text-muted-foreground font-mono">
+                      {message.data.sql}
+                    </pre>
+                  </details>
                 )}
               </div>
             )}

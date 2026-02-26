@@ -1,91 +1,189 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Mic, MicOff } from "lucide-react";
+import { Send, Mic, MicOff, ImagePlus, X } from "lucide-react";
+import { toast } from "sonner";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import ChatMessage, { type Message } from "@/components/ChatMessage";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { askQuestion, voiceAsk, ocrAsk, dataToTable, type ApiResponse } from "@/lib/api";
 
-const MOCK_RESPONSES: Record<string, Message["data"]> = {
-  spending: {
-    type: "chart",
-    chartType: "line",
-    title: "Monthly Spending Trend",
-    data: [
-      { name: "Jan", value: 12400 },
-      { name: "Feb", value: 9800 },
-      { name: "Mar", value: 15200 },
-      { name: "Apr", value: 11600 },
-      { name: "May", value: 18300 },
-      { name: "Jun", value: 14700 },
-    ],
-    summary: "Your spending shows an upward trend over the last 6 months, with a peak of ₹18,300 in May.",
-  },
-  top: {
-    type: "table",
-    title: "Top 5 Transactions",
-    columns: ["Date", "Description", "Amount", "Category"],
-    rows: [
-      ["2025-06-15", "Amazon India", "₹12,499", "Shopping"],
-      ["2025-06-10", "Rent Payment", "₹25,000", "Housing"],
-      ["2025-06-08", "Flight Booking", "₹8,750", "Travel"],
-      ["2025-06-03", "Electronics Store", "₹6,999", "Shopping"],
-      ["2025-06-01", "Insurance Premium", "₹5,200", "Insurance"],
-    ],
-    summary: "Here are your top 5 transactions by amount. Housing and Shopping dominate your expenses.",
-  },
-  total: {
-    type: "kpi",
-    title: "Total Spent This Month",
-    value: "₹1,24,850",
-    change: "+12.3%",
-    changeDirection: "up" as const,
-    summary: "Your total UPI spending this month is ₹1,24,850, up 12.3% compared to last month.",
-  },
-};
+// ─── Map API response → Message.data ─────────────────────────────────────────
 
-function classifyQuery(query: string): Message["data"] {
-  const q = query.toLowerCase();
-  if (q.includes("trend") || q.includes("spending")) return MOCK_RESPONSES.spending;
-  if (q.includes("top") || q.includes("transaction")) return MOCK_RESPONSES.top;
-  if (q.includes("total") || q.includes("spent")) return MOCK_RESPONSES.total;
+function apiResponseToMessageData(
+  res: ApiResponse
+): Message["data"] {
+  const tableData = dataToTable(res.data);
   return {
-    type: "text",
-    title: "Analysis",
-    content: "Based on your transaction data, I can see regular UPI payments across multiple categories. Try asking about your **spending trend**, **top transactions**, or **total spent** for specific visualizations.",
-    summary: "",
+    type: tableData ? "table" : "text",
+    title: "InsightX Analysis",
+    summary: res.answer,
+    ...(tableData
+      ? { columns: tableData.columns, rows: tableData.rows }
+      : { content: res.answer }),
+    sql: res.sql,
+    followUpQuestions: res.follow_up_questions,
   };
 }
+
+// ─── Dashboard ──────────────────────────────────────────────────────────────
+
+const SUGGESTIONS = [
+  "Show total UPI transactions",
+  "Top 5 transactions by amount",
+  "Transaction volume by bank",
+];
 
 const Dashboard = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  // Image upload state
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input };
+  // ── Send text question ──────────────────────────────────────────────────────
+
+  const sendQuestion = useCallback(async (question: string) => {
+    if (!question.trim() || isLoading) return;
+
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: question };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setSelectedImage(null);
     setIsLoading(true);
 
-    await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1000));
+    try {
+      let res: ApiResponse;
 
-    const data = classifyQuery(input);
-    const aiMsg: Message = {
-      id: (Date.now() + 1).toString(),
-      role: "ai",
-      content: data.summary || "",
-      data,
-    };
-    setMessages((prev) => [...prev, aiMsg]);
-    setIsLoading(false);
+      if (selectedImage) {
+        // Image + optional text context
+        res = await ocrAsk(selectedImage, question);
+        toast.success("Image analysed successfully");
+      } else {
+        res = await askQuestion(question);
+      }
+
+      const data = apiResponseToMessageData(res);
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "ai",
+        content: res.answer,
+        data,
+        onFollowUp: (q) => sendQuestion(q),
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Error: ${msg}`);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "ai",
+          content: "",
+          data: { type: "text", title: "Error", content: msg, summary: "" },
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, selectedImage]);
+
+  const handleSend = () => {
+    const question = input.trim() || (selectedImage ? `Analyse this image` : "");
+    if (!question && !selectedImage) return;
+    sendQuestion(question);
   };
+
+  // ── Voice Recording ─────────────────────────────────────────────────────────
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        setIsLoading(true);
+
+        const userMsg: Message = {
+          id: Date.now().toString(),
+          role: "user",
+          content: "🎤 Voice query...",
+        };
+        setMessages((prev) => [...prev, userMsg]);
+
+        try {
+          const res = await voiceAsk(blob);
+          // Update the user message with the transcription
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === userMsg.id ? { ...m, content: `🎤 "${res.transcription}"` } : m
+            )
+          );
+          const data = apiResponseToMessageData(res);
+          const aiMsg: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "ai",
+            content: res.answer,
+            data,
+            onFollowUp: (q) => sendQuestion(q),
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Transcription failed";
+          toast.error(msg);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setIsRecording(true);
+    } catch {
+      toast.error("Microphone access denied. Please allow mic permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) stopRecording();
+    else startRecording();
+  };
+
+  // ── Image Upload ────────────────────────────────────────────────────────────
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      toast.info(`Image selected: ${file.name}`);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <SidebarProvider>
@@ -119,22 +217,18 @@ const Dashboard = () => {
                     Welcome to InsightX
                   </h2>
                   <p className="text-muted-foreground max-w-md">
-                    Ask anything about your UPI transactions. Try "Show my spending trend" or "Top 5 transactions."
+                    Ask anything about your UPI transactions — by text, voice, or image.
                   </p>
                   <div className="flex flex-wrap gap-2 mt-6 justify-center">
-                    {["Show my spending trend", "Top 5 transactions", "Total spent this month"].map(
-                      (q) => (
-                        <button
-                          key={q}
-                          onClick={() => {
-                            setInput(q);
-                          }}
-                          className="px-4 py-2 rounded-xl text-sm border border-border/50 bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
-                        >
-                          {q}
-                        </button>
-                      )
-                    )}
+                    {SUGGESTIONS.map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => sendQuestion(q)}
+                        className="px-4 py-2 rounded-xl text-sm border border-border/50 bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
+                      >
+                        {q}
+                      </button>
+                    ))}
                   </div>
                 </motion.div>
               </div>
@@ -168,15 +262,28 @@ const Dashboard = () => {
 
           {/* Input Area */}
           <div className="sticky bottom-0 px-4 md:px-8 py-4 bg-gradient-to-t from-background via-background to-background/0">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto space-y-2">
+              {/* Image preview chip */}
+              {selectedImage && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/60 w-fit text-sm text-muted-foreground border border-border/40">
+                  <ImagePlus className="w-3.5 h-3.5" />
+                  <span className="max-w-[200px] truncate">{selectedImage.name}</span>
+                  <button onClick={() => setSelectedImage(null)} className="ml-1 hover:text-foreground">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
               <div className="glass-card flex items-center gap-2 px-4 py-2">
+                {/* Microphone */}
                 <button
-                  onClick={() => setIsRecording(!isRecording)}
-                  className={`relative p-2.5 rounded-xl transition-all ${
-                    isRecording
+                  onClick={toggleRecording}
+                  disabled={isLoading}
+                  className={`relative p-2.5 rounded-xl transition-all ${isRecording
                       ? "bg-accent/20 text-accent"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  }`}
+                    } disabled:opacity-40`}
+                  title={isRecording ? "Stop recording" : "Start voice query"}
                 >
                   {isRecording && <span className="pulse-ring" />}
                   {isRecording ? (
@@ -186,6 +293,7 @@ const Dashboard = () => {
                   )}
                 </button>
 
+                {/* Waveform animation while recording */}
                 {isRecording && (
                   <div className="flex items-center gap-1 px-2">
                     {[...Array(5)].map((_, i) => (
@@ -201,17 +309,42 @@ const Dashboard = () => {
                   </div>
                 )}
 
+                {/* Image upload */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  className="p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-40"
+                  title="Upload image for OCR analysis"
+                >
+                  <ImagePlus className="w-5 h-5" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/bmp"
+                  className="hidden"
+                  onChange={handleImageChange}
+                />
+
+                {/* Text input */}
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder="Ask about your transaction history..."
-                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm py-2"
+                  placeholder={
+                    selectedImage
+                      ? "Add context or press send to analyse the image…"
+                      : "Ask about your transaction history…"
+                  }
+                  disabled={isRecording}
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm py-2 disabled:opacity-40"
                 />
+
+                {/* Send */}
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || isLoading}
+                  disabled={(!input.trim() && !selectedImage) || isLoading || isRecording}
                   className="p-2.5 rounded-xl glow-button text-primary-foreground disabled:opacity-30 disabled:shadow-none transition-all"
                 >
                   <Send className="w-4 h-4" />
