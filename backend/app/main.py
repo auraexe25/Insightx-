@@ -118,26 +118,65 @@ app.add_middleware(
 )
 
 
-# â”€â”€ Pydantic Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Pydantic Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class ChatMessage(BaseModel):
+    role: str       # "user" | "assistant"
+    content: str
 
 class QueryRequest(BaseModel):
     question: str
+    chat_history: list[ChatMessage] = []
 
+# â”€â”€ DB Schema (used to ground follow-up question generation) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-# â”€â”€ Groq Synthesis Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+DB_SCHEMA = """
+Table: transactions
+Columns:
+  transaction_id TEXT       -- unique ID e.g. TXN0000000001
+  timestamp TEXT            -- datetime e.g. 2024-10-08 15:17:28
+  transaction_type TEXT     -- P2P | P2M | Bill Payment | Recharge
+  merchant_category TEXT    -- Food | Grocery | Shopping | Fuel | Utilities | Entertainment | Healthcare | Transport | Education | Other (NULL for P2P)
+  amount_inr INTEGER        -- transaction amount in INR
+  transaction_status TEXT   -- SUCCESS | FAILED
+  sender_age_group TEXT     -- 18-25 | 26-35 | 36-45 | 46-55 | 56+
+  receiver_age_group TEXT   -- same as sender (NULL for non-P2P)
+  sender_state TEXT         -- Indian state e.g. Delhi, Maharashtra, Karnataka
+  sender_bank TEXT          -- SBI | HDFC | ICICI | Axis | Kotak | PNB | Yes Bank | IndusInd
+  receiver_bank TEXT        -- same options as sender_bank
+  device_type TEXT          -- Android | iOS | Web
+  network_type TEXT         -- 3G | 4G | 5G | WiFi
+  fraud_flag INTEGER        -- 0 (not fraud) | 1 (fraud)
+  hour_of_day INTEGER       -- 0-23
+  day_of_week TEXT          -- Monday - Sunday
+  is_weekend INTEGER        -- 0 (weekday) | 1 (weekend)
+  day_part TEXT             -- Morning | Afternoon | Evening | Night
+  amount_tier TEXT          -- Small (<500) | Medium (500-5000) | Large (5000-50000)
+  sender_age_label TEXT     -- Young (18-25) | Adult (26-55) | Old (56+)
+  receiver_age_label TEXT   -- Young | Adult | Old (NULL for non-P2P)
+"""
 
-SYNTHESIS_PROMPT = """You are an elite data analyst for InsightX. \
-The user asked: "{question}". \
+# â”€â”€ Groq Synthesis Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+SYNTHESIS_PROMPT = """You are an elite data analyst for InsightX.
+The user asked: "{question}".
 The database returned this exact data:
 {df_markdown}
 
-Task 1: Write a concise, highly professional executive summary (2-3 sentences) of this data. \
-Highlight the most important business finding. Format it beautifully. \
-Include rupee symbols (â‚¹) for currency.
-Task 2: Suggest exactly 3 logical follow-up questions to dig deeper.
+--- DATABASE SCHEMA ---
+{schema}
+--- END SCHEMA ---
 
-You MUST return your response as a valid JSON object. \
-Use exactly these keys: "answer" (string) and "follow_up_questions" (list of strings)."""
+Task 1: Write a concise executive summary (2-3 sentences) of the data above.
+Highlight the single most important business finding. Use \u20b9 for INR values.
+
+Task 2: Suggest exactly 3 follow-up questions. STRICT RULES:
+- Every question MUST be answerable using only the columns and values listed in the schema.
+- Reference real column names and real values (e.g. sender_bank = 'HDFC', transaction_type = 'P2P').
+- Do NOT invent columns, tables, or data that are not in the schema.
+- Questions should be a natural, different-angle continuation of the current analysis.
+
+Return valid JSON with exactly these keys: "answer" (string), "follow_up_questions" (list of 3 strings)."""
 
 
 # â”€â”€ Core Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -153,8 +192,57 @@ async def ask_insightx(request: QueryRequest):
         if not question:
             raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-        # â”€â”€ Step A: Vanna AI â€” Generate SQL & Execute â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # -- Step 0: Intent Guardrail -----------------------------------------
+        # Ask Groq to classify whether the input is a UPI data question or not.
+        # This prevents Vanna from generating random SQL for greetings etc.
+        intent_check = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Is this a data or analytics question about UPI transactions or financial data? "
+                    f"Reply with exactly one word: YES or NO.\n\nInput: \"{question}\""
+                )
+            }],
+            temperature=0.0,
+            max_tokens=5,
+        )
+        intent = intent_check.choices[0].message.content.strip().upper()
+
+        if not intent.startswith("YES"):
+            # Not a data question â€” return a friendly conversational response
+            chat_reply = groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[{
+                    "role": "system",
+                    "content": (
+                        "You are InsightX, an AI assistant for UPI transaction analytics. "
+                        "If the user sends a greeting or off-topic message, reply briefly and "
+                        "guide them to ask a data question. Keep it friendly and concise."
+                    )
+                }, {
+                    "role": "user",
+                    "content": question,
+                }],
+                temperature=0.7,
+                max_tokens=150,
+            )
+            reply_text = chat_reply.choices[0].message.content.strip()
+            return {
+                "question": question,
+                "sql": "",
+                "data": [],
+                "answer": reply_text,
+                "follow_up_questions": [
+                    "Show total UPI transaction volume",
+                    "Which bank had the most transactions?",
+                    "What are the top 5 transactions by amount?",
+                ],
+            }
+
+        # -- Step A: Vanna AI -- Generate SQL & Execute -----------------------
         generated_sql = vn.generate_sql(question)
+
 
         if generated_sql is None or generated_sql.strip() == "":
             generated_sql = "-- Could not generate SQL"
@@ -174,15 +262,30 @@ async def ask_insightx(request: QueryRequest):
             df_markdown = df.to_markdown(index=False)
             data_dict = df.fillna("None").to_dict(orient="records")
 
-        # â”€â”€ Step C + D: Groq Synthesis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # -- Step C + D: Groq Synthesis with chat history ─────────────────────
         prompt = SYNTHESIS_PROMPT.format(
             question=question,
             df_markdown=df_markdown,
+            schema=DB_SCHEMA,
         )
+
+        # Build message list: system + prior history + current synthesis prompt
+        history_messages = [
+            {"role": msg.role, "content": msg.content}
+            for msg in request.chat_history[-6:]   # last 3 turns (6 messages)
+        ]
 
         groq_response = groq_client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are InsightX, an expert data analyst for UPI transaction data. "
+                        "You answer questions about the transactions SQLite database."
+                    ),
+                },
+                *history_messages,
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,

@@ -5,13 +5,18 @@ import { toast } from "sonner";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import ChatMessage, { type Message } from "@/components/ChatMessage";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { askQuestion, voiceAsk, ocrAsk, dataToTable, type ApiResponse } from "@/lib/api";
+import {
+  askQuestion,
+  voiceAsk,
+  ocrAsk,
+  dataToTable,
+  type ApiResponse,
+  type ChatHistoryMessage,
+} from "@/lib/api";
 
-// ─── Map API response → Message.data ─────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function apiResponseToMessageData(
-  res: ApiResponse
-): Message["data"] {
+function apiResponseToMessageData(res: ApiResponse): Message["data"] {
   const tableData = dataToTable(res.data);
   return {
     type: tableData ? "table" : "text",
@@ -25,7 +30,17 @@ function apiResponseToMessageData(
   };
 }
 
-// ─── Dashboard ──────────────────────────────────────────────────────────────
+/** Convert current message list into chat history for the backend */
+function buildChatHistory(messages: Message[]): ChatHistoryMessage[] {
+  return messages
+    .filter((m) => m.content.trim() && !m.content.startsWith("🎤 Voice"))
+    .map((m) => ({
+      role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+      content: m.role === "ai" ? (m.data?.summary ?? m.content) : m.content,
+    }));
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
   "Show total UPI transactions",
@@ -33,17 +48,19 @@ const SUGGESTIONS = [
   "Transaction volume by bank",
 ];
 
+// ─── Dashboard Component ──────────────────────────────────────────────────────
+
 const Dashboard = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Voice recording state
+  // Voice recording
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Image upload state
+  // Image upload
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,56 +70,68 @@ const Dashboard = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // ── Send text question ──────────────────────────────────────────────────────
+  // ── Send text / image question ──────────────────────────────────────────────
 
-  const sendQuestion = useCallback(async (question: string) => {
-    if (!question.trim() || isLoading) return;
+  const sendQuestion = useCallback(
+    async (question: string, snapshot?: ChatHistoryMessage[]) => {
+      if (!question.trim() || isLoading) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: question };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setSelectedImage(null);
-    setIsLoading(true);
+      // History snapshot BEFORE appending the new user message
+      const history = snapshot ?? buildChatHistory(messages);
 
-    try {
-      let res: ApiResponse;
+      const userMsg: Message = { id: Date.now().toString(), role: "user", content: question };
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setIsLoading(true);
 
-      if (selectedImage) {
-        // Image + optional text context
-        res = await ocrAsk(selectedImage, question);
-        toast.success("Image analysed successfully");
-      } else {
-        res = await askQuestion(question);
-      }
+      const imgToSend = selectedImage;
+      setSelectedImage(null);
 
-      const data = apiResponseToMessageData(res);
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "ai",
-        content: res.answer,
-        data,
-        onFollowUp: (q) => sendQuestion(q),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      toast.error(`Error: ${msg}`);
-      setMessages((prev) => [
-        ...prev,
-        {
+      try {
+        let res: ApiResponse;
+        if (imgToSend) {
+          res = await ocrAsk(imgToSend, question, history);
+          toast.success("Image analysed successfully");
+        } else {
+          res = await askQuestion(question, history);
+        }
+
+        const data = apiResponseToMessageData(res);
+        const aiMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: "ai",
-          content: "",
-          data: { type: "text", title: "Error", content: msg, summary: "" },
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading, selectedImage]);
+          content: res.answer,
+          data,
+          onFollowUp: (q) => {
+            const nextHistory = buildChatHistory([...messages, userMsg, {
+              id: "tmp", role: "ai", content: res.answer,
+              data: { type: "text", title: "", summary: res.answer }
+            }]);
+            sendQuestion(q, nextHistory);
+          },
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        toast.error(`Error: ${msg}`);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "ai",
+            content: "",
+            data: { type: "text", title: "Error", content: msg, summary: "" },
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, selectedImage, messages]
+  );
 
   const handleSend = () => {
-    const question = input.trim() || (selectedImage ? `Analyse this image` : "");
+    const question = input.trim() || (selectedImage ? "Analyse this image" : "");
     if (!question && !selectedImage) return;
     sendQuestion(question);
   };
@@ -122,6 +151,7 @@ const Dashboard = () => {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         setIsLoading(true);
 
+        const history = buildChatHistory(messages);
         const userMsg: Message = {
           id: Date.now().toString(),
           role: "user",
@@ -130,8 +160,7 @@ const Dashboard = () => {
         setMessages((prev) => [...prev, userMsg]);
 
         try {
-          const res = await voiceAsk(blob);
-          // Update the user message with the transcription
+          const res = await voiceAsk(blob, history);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === userMsg.id ? { ...m, content: `🎤 "${res.transcription}"` } : m
@@ -158,7 +187,7 @@ const Dashboard = () => {
       mediaRecorderRef.current = mr;
       setIsRecording(true);
     } catch {
-      toast.error("Microphone access denied. Please allow mic permissions.");
+      toast.error("Microphone access denied.");
     }
   };
 
@@ -190,6 +219,7 @@ const Dashboard = () => {
       <div className="flex min-h-screen w-full bg-background">
         <DashboardSidebar />
         <div className="flex-1 flex flex-col min-h-screen">
+
           {/* Header */}
           <header className="flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm">
             <SidebarTrigger />
@@ -213,9 +243,7 @@ const Dashboard = () => {
                   <div className="w-16 h-16 rounded-2xl glow-button flex items-center justify-center text-2xl font-bold mb-6 mx-auto">
                     IX
                   </div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
-                    Welcome to InsightX
-                  </h2>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Welcome to InsightX</h2>
                   <p className="text-muted-foreground max-w-md">
                     Ask anything about your UPI transactions — by text, voice, or image.
                   </p>
@@ -263,6 +291,7 @@ const Dashboard = () => {
           {/* Input Area */}
           <div className="sticky bottom-0 px-4 md:px-8 py-4 bg-gradient-to-t from-background via-background to-background/0">
             <div className="max-w-3xl mx-auto space-y-2">
+
               {/* Image preview chip */}
               {selectedImage && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/60 w-fit text-sm text-muted-foreground border border-border/40">
@@ -275,6 +304,7 @@ const Dashboard = () => {
               )}
 
               <div className="glass-card flex items-center gap-2 px-4 py-2">
+
                 {/* Microphone */}
                 <button
                   onClick={toggleRecording}
@@ -293,17 +323,13 @@ const Dashboard = () => {
                   )}
                 </button>
 
-                {/* Waveform animation while recording */}
                 {isRecording && (
                   <div className="flex items-center gap-1 px-2">
                     {[...Array(5)].map((_, i) => (
                       <div
                         key={i}
                         className="w-1 bg-accent rounded-full"
-                        style={{
-                          animation: `waveform 0.6s ease-in-out ${i * 0.1}s infinite`,
-                          height: "4px",
-                        }}
+                        style={{ animation: `waveform 0.6s ease-in-out ${i * 0.1}s infinite`, height: "4px" }}
                       />
                     ))}
                   </div>
@@ -352,6 +378,7 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </SidebarProvider>
