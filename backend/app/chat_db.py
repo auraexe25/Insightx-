@@ -115,7 +115,11 @@ def add_message(
                VALUES (?, ?, ?, ?, ?, ?)""",
             (session_id, role, content, sql_text, data_json, now),
         )
-        _touch_session(session_id)
+        # Bump session updated_at in the SAME connection (avoids database-locked)
+        conn.execute(
+            "UPDATE sessions SET updated_at = ? WHERE id = ?",
+            (now, session_id),
+        )
     return cur.lastrowid  # type: ignore
 
 

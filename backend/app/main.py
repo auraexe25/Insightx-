@@ -260,8 +260,9 @@ async def ask_insightx(request: QueryRequest):
                     msgs = chat_db.get_messages(request.session_id)
                     if len(msgs) <= 2:
                         chat_db.auto_title(request.session_id, question)
-                except Exception:
-                    pass
+                except Exception as save_err:
+                    print(f"[SAVE ERROR - conversational] {save_err}")
+                    traceback.print_exc()
 
             return response_payload
 
@@ -356,8 +357,9 @@ async def ask_insightx(request: QueryRequest):
                 msgs = chat_db.get_messages(request.session_id)
                 if len(msgs) <= 2:
                     chat_db.auto_title(request.session_id, question)
-            except Exception:
-                pass
+            except Exception as save_err:
+                print(f"[SAVE ERROR - data] {save_err}")
+                traceback.print_exc()
 
         return response_payload
 
