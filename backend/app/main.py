@@ -1,12 +1,12 @@
 ﻿"""
-app/main.py â€” InsightX Agentic API (Dual-AI Pipeline).
+app/main.py -- InsightX Agentic API (Dual-AI Pipeline).
 
 Pipeline:
-  User Question â†’ Vanna AI (Local ChromaDB + Groq LLM for SQL)
-  â†’ Groq LLM (Executive Summary + Follow-ups)
-  â†’ Unified JSON Response
+  User Question -> Vanna AI (Local ChromaDB + Groq LLM for SQL)
+  -> Groq LLM (Executive Summary + Follow-ups)
+  -> Unified JSON Response
 
-No external Vanna API key needed â€” all training data lives in local ChromaDB.
+No external Vanna API key needed -- all training data lives in local ChromaDB.
 """
 
 import json
@@ -18,6 +18,8 @@ import sys
 sys.stdout.reconfigure(encoding="utf-8")
 
 import traceback
+
+from app import chat_db
 
 # Add scripts directory to path to import EasyOCRModel
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,14 +46,14 @@ except ImportError:
     print("[!] Could not import EasyOCRModel. Make sure easyocr is installed.")
     EasyOCRModel = None
 
-# â”€â”€ Path Resolution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Path Resolution -----------------------------------------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
 DB_PATH = os.path.join(PROJECT_ROOT, "data", "upi_transactions.db")
 VECTOR_STORE_PATH = os.path.join(PROJECT_ROOT, "vector_store")
 
-# â”€â”€ Load Environment Variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Load Environment Variables ------------------------------------------------
 
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
@@ -62,7 +64,7 @@ if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY not found. Create a .env file in backend/ (see .env.example).")
 
 
-# â”€â”€ Vanna AI â€” Local ChromaDB + Groq (OpenAI-compatible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Vanna AI -- Local ChromaDB + Groq (OpenAI-compatible) ---------------------
 
 class MyVanna(ChromaDB_VectorStore, OpenAI_Chat):
     def __init__(self, client=None, config=None):
@@ -81,32 +83,36 @@ vn = MyVanna(client=vanna_client, config={
     "path": VECTOR_STORE_PATH,
 })
 vn.connect_to_sqlite(DB_PATH)
-print(f"[âœ“] Vanna AI initialized (local ChromaDB: {VECTOR_STORE_PATH})")
-print(f"[âœ“] Connected to SQLite: {DB_PATH}")
+print(f"[OK] Vanna AI initialized (local ChromaDB: {VECTOR_STORE_PATH})")
+print(f"[OK] Connected to SQLite: {DB_PATH}")
 
 # Groq native client for answer synthesis
 groq_client = Groq(api_key=GROQ_API_KEY)
-print(f"[âœ“] Groq LLM initialized (model: {GROQ_MODEL})")
+print(f"[OK] Groq LLM initialized (model: {GROQ_MODEL})")
 
-# â”€â”€ Whisper STT Model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Whisper STT Model ---------------------------------------------------------
 
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
 print(f"Loading Whisper '{WHISPER_MODEL_NAME}' model...")
 whisper_model = whisper.load_model(WHISPER_MODEL_NAME)
-print(f"[âœ“] Whisper STT initialized (model: {WHISPER_MODEL_NAME})")
+print(f"[OK] Whisper STT initialized (model: {WHISPER_MODEL_NAME})")
 
-# â”€â”€ OCR Model (EasyOCR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- OCR Model (EasyOCR) ------------------------------------------------------
 
 print("Loading EasyOCR model...")
 try:
-    ocr_model = EasyOCRModel(languages=['en'], gpu=False)  # CPU by default for safety
-    print("[âœ“] EasyOCR initialized")
+    ocr_model = EasyOCRModel(languages=['en'], gpu=False)
+    print("[OK] EasyOCR initialized")
 except Exception as e:
     print(f"[!] OCR Init Failed: {e}")
     ocr_model = None
 
+# -- Chat History DB -----------------------------------------------------------
 
-# â”€â”€ FastAPI App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+chat_db.init_db()
+print("[OK] Chat history database initialized")
+
+# -- FastAPI App ---------------------------------------------------------------
 
 app = FastAPI(title="InsightX Agentic API")
 
@@ -118,7 +124,7 @@ app.add_middleware(
 )
 
 
-# â”€â”€ Pydantic Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Pydantic Models -----------------------------------------------------------
 
 class ChatMessage(BaseModel):
     role: str       # "user" | "assistant"
@@ -127,8 +133,10 @@ class ChatMessage(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     chat_history: list[ChatMessage] = []
+    session_id: str | None = None
 
-# â”€â”€ DB Schema (used to ground follow-up question generation) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+# -- DB Schema (used to ground follow-up question generation) ------------------
 
 DB_SCHEMA = """
 Table: transactions
@@ -156,7 +164,7 @@ Columns:
   receiver_age_label TEXT   -- Young | Adult | Old (NULL for non-P2P)
 """
 
-# â”€â”€ Groq Synthesis Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Groq Synthesis Prompt -----------------------------------------------------
 
 SYNTHESIS_PROMPT = """You are an elite data analyst for InsightX.
 The user asked: "{question}".
@@ -179,22 +187,20 @@ Task 2: Suggest exactly 3 follow-up questions. STRICT RULES:
 Return valid JSON with exactly these keys: "answer" (string), "follow_up_questions" (list of 3 strings)."""
 
 
-# â”€â”€ Core Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Core Endpoint: /api/ask ---------------------------------------------------
 
 @app.post("/api/ask")
 async def ask_insightx(request: QueryRequest):
     """
     Full Dual-AI Pipeline:
-      Question â†’ Vanna (SQL + Data via local ChromaDB) â†’ Groq (Summary + Follow-ups) â†’ JSON
+      Question -> Vanna (SQL + Data) -> Groq (Summary + Follow-ups) -> JSON
     """
     try:
         question = request.question.strip()
         if not question:
             raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-        # -- Step 0: Intent Guardrail -----------------------------------------
-        # Ask Groq to classify whether the input is a UPI data question or not.
-        # This prevents Vanna from generating random SQL for greetings etc.
+        # -- Step 0: Intent Guardrail ------------------------------------------
         intent_check = groq_client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[{
@@ -210,8 +216,7 @@ async def ask_insightx(request: QueryRequest):
         intent = intent_check.choices[0].message.content.strip().upper()
 
         if not intent.startswith("YES"):
-            # Not a data question -- return a friendly conversational response
-            # Include chat history so the bot can remember names, prior context, etc.
+            # Not a data question -- friendly conversational response with history
             history_msgs = [
                 {"role": msg.role, "content": msg.content}
                 for msg in request.chat_history[-10:]
@@ -235,7 +240,7 @@ async def ask_insightx(request: QueryRequest):
                 max_tokens=150,
             )
             reply_text = chat_reply.choices[0].message.content.strip()
-            return {
+            response_payload = {
                 "question": question,
                 "sql": "",
                 "data": [],
@@ -247,10 +252,21 @@ async def ask_insightx(request: QueryRequest):
                 ],
             }
 
+            # Save to DB
+            if request.session_id:
+                try:
+                    chat_db.add_message(request.session_id, "user", question)
+                    chat_db.add_message(request.session_id, "assistant", reply_text)
+                    msgs = chat_db.get_messages(request.session_id)
+                    if len(msgs) <= 2:
+                        chat_db.auto_title(request.session_id, question)
+                except Exception:
+                    pass
 
-        # -- Step A: Vanna AI -- Generate SQL & Execute -----------------------
+            return response_payload
+
+        # -- Step A: Vanna AI -- Generate SQL & Execute ------------------------
         generated_sql = vn.generate_sql(question)
-
 
         if generated_sql is None or generated_sql.strip() == "":
             generated_sql = "-- Could not generate SQL"
@@ -262,7 +278,7 @@ async def ask_insightx(request: QueryRequest):
             except Exception:
                 df = None
 
-        # â”€â”€ Step B: Data Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # -- Step B: Data Formatting -------------------------------------------
         if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             df_markdown = "No data found."
             data_dict = []
@@ -270,17 +286,16 @@ async def ask_insightx(request: QueryRequest):
             df_markdown = df.to_markdown(index=False)
             data_dict = df.fillna("None").to_dict(orient="records")
 
-        # -- Step C + D: Groq Synthesis with chat history ─────────────────────
+        # -- Step C: Groq Synthesis with chat history --------------------------
         prompt = SYNTHESIS_PROMPT.format(
             question=question,
             df_markdown=df_markdown,
             schema=DB_SCHEMA,
         )
 
-        # Build message list: system + prior history + current synthesis prompt
         history_messages = [
             {"role": msg.role, "content": msg.content}
-            for msg in request.chat_history[-6:]   # last 3 turns (6 messages)
+            for msg in request.chat_history[-6:]
         ]
 
         groq_response = groq_client.chat.completions.create(
@@ -303,7 +318,7 @@ async def ask_insightx(request: QueryRequest):
 
         raw_content = groq_response.choices[0].message.content.strip()
 
-        # â”€â”€ Step E: Response Parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # -- Step D: Response Parsing ------------------------------------------
         try:
             llm_result = json.loads(raw_content)
         except json.JSONDecodeError:
@@ -319,14 +334,32 @@ async def ask_insightx(request: QueryRequest):
         answer = llm_result.get("answer", raw_content)
         follow_ups = llm_result.get("follow_up_questions", [])[:3]
 
-        # â”€â”€ Step F: Final Return â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        return {
+        # -- Step E: Persist to DB & Return ------------------------------------
+        response_payload = {
             "question": question,
             "sql": generated_sql,
             "data": data_dict,
             "answer": answer,
             "follow_up_questions": follow_ups,
         }
+
+        if request.session_id:
+            try:
+                chat_db.add_message(request.session_id, "user", question)
+                chat_db.add_message(
+                    session_id=request.session_id,
+                    role="assistant",
+                    content=answer,
+                    sql_text=generated_sql,
+                    data_json=json.dumps(response_payload, default=str),
+                )
+                msgs = chat_db.get_messages(request.session_id)
+                if len(msgs) <= 2:
+                    chat_db.auto_title(request.session_id, question)
+            except Exception:
+                pass
+
+        return response_payload
 
     except HTTPException:
         raise
@@ -335,41 +368,33 @@ async def ask_insightx(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# â”€â”€ Speech-to-Text Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Speech-to-Text Endpoint --------------------------------------------------
 
 @app.post("/api/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
-    """
-    Accepts an audio file upload (wav, webm, mp3, ogg, m4a) and returns
-    the transcribed text using local Whisper.
-    """
+    """Accepts audio file upload and returns transcribed text using local Whisper."""
     ALLOWED_TYPES = {
         "audio/wav", "audio/x-wav", "audio/wave",
         "audio/webm", "audio/ogg", "audio/mpeg", "audio/mp3",
         "audio/mp4", "audio/x-m4a", "audio/aac",
-        "video/webm",  # browsers often send webm as video/webm
+        "video/webm",
     }
 
     if audio.content_type and audio.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported audio type: {audio.content_type}. "
-                   f"Accepted: wav, webm, mp3, ogg, m4a.",
+            detail=f"Unsupported audio type: {audio.content_type}. Accepted: wav, webm, mp3, ogg, m4a.",
         )
 
     try:
-        # Save uploaded audio to a temp file (Whisper needs a file path)
-        suffix = ".webm"  # safe default; Whisper/ffmpeg auto-detects format
+        suffix = ".webm"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             contents = await audio.read()
             tmp.write(contents)
             tmp_path = tmp.name
 
-        # Transcribe
         result = whisper_model.transcribe(tmp_path)
         transcription = result["text"].strip()
-
-        # Cleanup
         os.unlink(tmp_path)
 
         return {"transcription": transcription}
@@ -381,36 +406,26 @@ async def transcribe_audio(audio: UploadFile = File(...)):
 
 @app.post("/api/voice-ask")
 async def voice_ask(audio: UploadFile = File(...)):
-    """
-    Combined endpoint: Transcribe audio â†’ run the full Dual-AI Pipeline.
-    Returns transcription + executive summary + follow-ups in one request.
-    """
-    # Step 1: Transcribe
+    """Combined: Transcribe audio -> run full Dual-AI Pipeline."""
     transcription_response = await transcribe_audio(audio)
     transcription = transcription_response["transcription"]
 
     if not transcription:
         raise HTTPException(status_code=400, detail="Could not transcribe any speech from the audio.")
 
-    # Step 2: Run through the existing pipeline
     pipeline_result = await ask_insightx(QueryRequest(question=transcription))
-
-    # Step 3: Return combined response
     pipeline_result["transcription"] = transcription
     return pipeline_result
 
 
-# â”€â”€ OCR / Image Endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- OCR / Image Endpoint -----------------------------------------------------
 
 @app.post("/api/ocr-ask")
 async def ocr_ask(
     image: UploadFile = File(...),
     text: Optional[str] = Form(None)
 ):
-    """
-    Accepts an image upload + optional text â†’ Extracts text (OCR) â†’ Formulates Question (Groq)
-    â†’ Runs Vanna Pipeline.
-    """
+    """Accepts image + optional text -> OCR -> Groq interpretation -> Vanna Pipeline."""
     if ocr_model is None:
         raise HTTPException(status_code=503, detail="OCR service is not available.")
 
@@ -419,24 +434,21 @@ async def ocr_ask(
         raise HTTPException(status_code=400, detail=f"Unsupported image type: {image.content_type}")
 
     try:
-        # 1. Save temp file
         suffix = os.path.splitext(image.filename)[1] or ".jpg"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             contents = await image.read()
             tmp.write(contents)
             tmp_path = tmp.name
 
-        # 2. Extract Text via OCR
         print(f"Running OCR on {tmp_path}...")
         extracted_text = ocr_model.extract_text(tmp_path)
-        os.unlink(tmp_path)  # Cleanup
+        os.unlink(tmp_path)
 
         if not extracted_text or len(extracted_text.strip()) < 5:
             raise HTTPException(status_code=400, detail="No readable text found in the image.")
 
         print(f"OCR Extracted: {extracted_text[:100]}...")
 
-        # 3. Interpret Text -> Question (Groq)
         base_prompt = (
             f"I have extracted the following text from an image (chart, report, or screenshot):\n"
             f"\"\"\"{extracted_text}\"\"\"\n"
@@ -466,12 +478,9 @@ async def ocr_ask(
         formulated_question = groq_resp.choices[0].message.content.strip()
         print(f"Formulated Question: {formulated_question}")
 
-        # 4. Run Vanna Pipeline
         pipeline_result = await ask_insightx(QueryRequest(question=formulated_question))
-
-        # 5. Add metadata
         pipeline_result["ocr_text"] = extracted_text
-        pipeline_result["original_question"] = formulated_question  # The question derived from OCR
+        pipeline_result["original_question"] = formulated_question
 
         return pipeline_result
 
@@ -480,15 +489,41 @@ async def ocr_ask(
         raise HTTPException(status_code=500, detail=f"OCR pipeline failed: {str(e)}")
 
 
-# â”€â”€ Health Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Session CRUD Endpoints ----------------------------------------------------
+
+@app.get("/api/sessions")
+async def list_sessions():
+    """List all chat sessions, newest first."""
+    return chat_db.list_sessions()
+
+@app.post("/api/sessions")
+async def create_session():
+    """Create a new chat session."""
+    return chat_db.create_session()
+
+@app.get("/api/sessions/{session_id}/messages")
+async def get_session_messages(session_id: str):
+    """Get all messages for a session."""
+    return chat_db.get_messages(session_id)
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a chat session and all its messages."""
+    deleted = chat_db.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"ok": True}
+
+
+# -- Health Check --------------------------------------------------------------
 
 @app.get("/")
 async def health_check():
     return {"status": "ok", "service": "InsightX Agentic API"}
 
 
-# â”€â”€ Run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Run -----------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("[âœ“] Starting InsightX Agentic API on http://localhost:8000")
+    print("[OK] Starting InsightX Agentic API on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

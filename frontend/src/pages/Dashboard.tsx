@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Mic, MicOff, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -10,11 +11,13 @@ import {
   voiceAsk,
   ocrAsk,
   dataToTable,
+  createSession,
+  getSessionMessages,
   type ApiResponse,
   type ChatHistoryMessage,
 } from "@/lib/api";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 function apiResponseToMessageData(res: ApiResponse): Message["data"] {
   const tableData = dataToTable(res.data);
@@ -30,17 +33,14 @@ function apiResponseToMessageData(res: ApiResponse): Message["data"] {
   };
 }
 
-/** Convert current message list into chat history for the backend */
 function buildChatHistory(messages: Message[]): ChatHistoryMessage[] {
   return messages
-    .filter((m) => m.content.trim() && !m.content.startsWith("🎤 Voice"))
+    .filter((m) => m.content.trim() && !m.content.startsWith("\ud83c\udfa4 Voice"))
     .map((m) => ({
       role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
       content: m.role === "ai" ? (m.data?.summary ?? m.content) : m.content,
     }));
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
   "Show total UPI transactions",
@@ -48,12 +48,17 @@ const SUGGESTIONS = [
   "Transaction volume by bank",
 ];
 
-// ─── Dashboard Component ──────────────────────────────────────────────────────
+// -- Dashboard Component ------------------------------------------------------
 
 const Dashboard = () => {
+  const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>();
+  const navigate = useNavigate();
+
+  const [sessionId, setSessionId] = useState<string | null>(urlSessionId ?? null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
@@ -66,17 +71,87 @@ const Dashboard = () => {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Sync URL param to state
+  useEffect(() => {
+    setSessionId(urlSessionId ?? null);
+  }, [urlSessionId]);
+
+  // Load messages when sessionId changes
+  useEffect(() => {
+    if (!sessionId) {
+      setMessages([]);
+      return;
+    }
+    (async () => {
+      try {
+        const stored = await getSessionMessages(sessionId);
+        const loaded: Message[] = stored.map((m, i) => {
+          if (m.role === "user") {
+            return { id: `s-${i}`, role: "user" as const, content: m.content };
+          }
+          // assistant
+          let data: Message["data"] | undefined;
+          try {
+            const full = typeof m.data === "string" ? JSON.parse(m.data) : m.data;
+            if (full && full.answer) {
+              const tableData = dataToTable(full.data ?? []);
+              data = {
+                type: tableData ? "table" : "text",
+                title: "InsightX Analysis",
+                summary: full.answer,
+                ...(tableData
+                  ? { columns: tableData.columns, rows: tableData.rows }
+                  : { content: full.answer }),
+                sql: full.sql ?? m.sql_text ?? "",
+                followUpQuestions: full.follow_up_questions ?? [],
+              };
+            }
+          } catch {
+            // fallback
+          }
+          if (!data) {
+            data = {
+              type: "text",
+              title: "InsightX Analysis",
+              summary: m.content,
+              content: m.content,
+            };
+          }
+          return {
+            id: `s-${i}`,
+            role: "ai" as const,
+            content: m.content,
+            data,
+          };
+        });
+        setMessages(loaded);
+      } catch {
+        // session might be invalid — just clear
+        setMessages([]);
+      }
+    })();
+  }, [sessionId]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // ── Send text / image question ──────────────────────────────────────────────
+  // Ensure session exists (auto-create if needed)
+  const ensureSession = useCallback(async (): Promise<string> => {
+    if (sessionId) return sessionId;
+    const session = await createSession();
+    setSessionId(session.id);
+    navigate(`/dashboard/${session.id}`, { replace: true });
+    return session.id;
+  }, [sessionId, navigate]);
+
+  // -- Send text / image question ---------------------------------------------
 
   const sendQuestion = useCallback(
     async (question: string, snapshot?: ChatHistoryMessage[]) => {
       if (!question.trim() || isLoading) return;
 
-      // History snapshot BEFORE appending the new user message
+      const sid = await ensureSession();
       const history = snapshot ?? buildChatHistory(messages);
 
       const userMsg: Message = { id: Date.now().toString(), role: "user", content: question };
@@ -93,7 +168,7 @@ const Dashboard = () => {
           res = await ocrAsk(imgToSend, question, history);
           toast.success("Image analysed successfully");
         } else {
-          res = await askQuestion(question, history);
+          res = await askQuestion(question, history, sid);
         }
 
         const data = apiResponseToMessageData(res);
@@ -103,14 +178,16 @@ const Dashboard = () => {
           content: res.answer,
           data,
           onFollowUp: (q) => {
-            const nextHistory = buildChatHistory([...messages, userMsg, {
-              id: "tmp", role: "ai", content: res.answer,
-              data: { type: "text", title: "", summary: res.answer }
-            }]);
+            const nextHistory = buildChatHistory([
+              ...messages,
+              userMsg,
+              { id: "tmp", role: "ai", content: res.answer, data: { type: "text", title: "", summary: res.answer } },
+            ]);
             sendQuestion(q, nextHistory);
           },
         };
         setMessages((prev) => [...prev, aiMsg]);
+        setSidebarRefreshKey((k) => k + 1);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         toast.error(`Error: ${msg}`);
@@ -127,7 +204,7 @@ const Dashboard = () => {
         setIsLoading(false);
       }
     },
-    [isLoading, selectedImage, messages]
+    [isLoading, selectedImage, messages, ensureSession],
   );
 
   const handleSend = () => {
@@ -136,7 +213,16 @@ const Dashboard = () => {
     sendQuestion(question);
   };
 
-  // ── Voice Recording ─────────────────────────────────────────────────────────
+  // -- New Chat ---------------------------------------------------------------
+
+  const handleNewChat = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setInput("");
+    navigate("/dashboard");
+  }, [navigate]);
+
+  // -- Voice Recording --------------------------------------------------------
 
   const startRecording = async () => {
     try {
@@ -150,21 +236,13 @@ const Dashboard = () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         setIsLoading(true);
-
         const history = buildChatHistory(messages);
-        const userMsg: Message = {
-          id: Date.now().toString(),
-          role: "user",
-          content: "🎤 Voice query...",
-        };
+        const userMsg: Message = { id: Date.now().toString(), role: "user", content: "\ud83c\udfa4 Voice query..." };
         setMessages((prev) => [...prev, userMsg]);
-
         try {
           const res = await voiceAsk(blob, history);
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === userMsg.id ? { ...m, content: `🎤 "${res.transcription}"` } : m
-            )
+            prev.map((m) => (m.id === userMsg.id ? { ...m, content: `\ud83c\udfa4 "${res.transcription}"` } : m)),
           );
           const data = apiResponseToMessageData(res);
           const aiMsg: Message = {
@@ -182,7 +260,6 @@ const Dashboard = () => {
           setIsLoading(false);
         }
       };
-
       mr.start();
       mediaRecorderRef.current = mr;
       setIsRecording(true);
@@ -195,13 +272,9 @@ const Dashboard = () => {
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
   };
+  const toggleRecording = () => (isRecording ? stopRecording() : startRecording());
 
-  const toggleRecording = () => {
-    if (isRecording) stopRecording();
-    else startRecording();
-  };
-
-  // ── Image Upload ────────────────────────────────────────────────────────────
+  // -- Image Upload -----------------------------------------------------------
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -212,21 +285,23 @@ const Dashboard = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // -- Render -----------------------------------------------------------------
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
-        <DashboardSidebar />
+        <DashboardSidebar
+          activeSessionId={sessionId}
+          onNewChat={handleNewChat}
+          refreshKey={sidebarRefreshKey}
+        />
         <div className="flex-1 flex flex-col min-h-screen">
 
           {/* Header */}
           <header className="flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm">
             <SidebarTrigger />
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md glow-button flex items-center justify-center text-[10px] font-bold">
-                IX
-              </div>
+              <div className="w-6 h-6 rounded-md glow-button flex items-center justify-center text-[10px] font-bold">IX</div>
               <span className="font-semibold text-foreground text-sm">InsightX</span>
             </div>
           </header>
@@ -235,18 +310,10 @@ const Dashboard = () => {
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <div className="w-16 h-16 rounded-2xl glow-button flex items-center justify-center text-2xl font-bold mb-6 mx-auto">
-                    IX
-                  </div>
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
+                  <div className="w-16 h-16 rounded-2xl glow-button flex items-center justify-center text-2xl font-bold mb-6 mx-auto">IX</div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Welcome to InsightX</h2>
-                  <p className="text-muted-foreground max-w-md">
-                    Ask anything about your UPI transactions — by text, voice, or image.
-                  </p>
+                  <p className="text-muted-foreground max-w-md">Ask anything about your UPI transactions — by text, voice, or image.</p>
                   <div className="flex flex-wrap gap-2 mt-6 justify-center">
                     {SUGGESTIONS.map((q) => (
                       <button
@@ -270,14 +337,8 @@ const Dashboard = () => {
               </AnimatePresence>
 
               {isLoading && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex gap-3 items-start"
-                >
-                  <div className="w-8 h-8 rounded-lg glow-button flex items-center justify-center text-[10px] font-bold shrink-0">
-                    IX
-                  </div>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 items-start">
+                  <div className="w-8 h-8 rounded-lg glow-button flex items-center justify-center text-[10px] font-bold shrink-0">IX</div>
                   <div className="chat-ai-msg px-4 py-3 space-y-2 w-64">
                     <div className="h-3 w-3/4 rounded skeleton-shimmer" />
                     <div className="h-3 w-1/2 rounded skeleton-shimmer" />
@@ -291,8 +352,6 @@ const Dashboard = () => {
           {/* Input Area */}
           <div className="sticky bottom-0 px-4 md:px-8 py-4 bg-gradient-to-t from-background via-background to-background/0">
             <div className="max-w-3xl mx-auto space-y-2">
-
-              {/* Image preview chip */}
               {selectedImage && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/60 w-fit text-sm text-muted-foreground border border-border/40">
                   <ImagePlus className="w-3.5 h-3.5" />
@@ -304,23 +363,14 @@ const Dashboard = () => {
               )}
 
               <div className="glass-card flex items-center gap-2 px-4 py-2">
-
-                {/* Microphone */}
                 <button
                   onClick={toggleRecording}
                   disabled={isLoading}
-                  className={`relative p-2.5 rounded-xl transition-all ${isRecording
-                      ? "bg-accent/20 text-accent"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    } disabled:opacity-40`}
+                  className={`relative p-2.5 rounded-xl transition-all ${isRecording ? "bg-accent/20 text-accent" : "text-muted-foreground hover:text-foreground hover:bg-secondary"} disabled:opacity-40`}
                   title={isRecording ? "Stop recording" : "Start voice query"}
                 >
                   {isRecording && <span className="pulse-ring" />}
-                  {isRecording ? (
-                    <MicOff className="w-5 h-5 relative z-10" />
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
+                  {isRecording ? <MicOff className="w-5 h-5 relative z-10" /> : <Mic className="w-5 h-5" />}
                 </button>
 
                 {isRecording && (
@@ -335,7 +385,6 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Image upload */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading}
@@ -344,30 +393,18 @@ const Dashboard = () => {
                 >
                   <ImagePlus className="w-5 h-5" />
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/bmp"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
+                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/bmp" className="hidden" onChange={handleImageChange} />
 
-                {/* Text input */}
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder={
-                    selectedImage
-                      ? "Add context or press send to analyse the image…"
-                      : "Ask about your transaction history…"
-                  }
+                  placeholder={selectedImage ? "Add context or press send to analyse the image\u2026" : "Ask about your transaction history\u2026"}
                   disabled={isRecording}
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm py-2 disabled:opacity-40"
                 />
 
-                {/* Send */}
                 <button
                   onClick={handleSend}
                   disabled={(!input.trim() && !selectedImage) || isLoading || isRecording}
@@ -378,7 +415,6 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </SidebarProvider>
