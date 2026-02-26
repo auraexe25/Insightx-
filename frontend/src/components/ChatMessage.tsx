@@ -82,7 +82,7 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
                   </button>
                 </div>
                 <DataVisualizer data={message.data} />
-                {message.data.summary && (
+                {message.data.summary && message.data.type !== "text" && (
                   <p className="text-sm text-muted-foreground pt-2 border-t border-border/30">
                     {message.data.summary}
                   </p>

@@ -210,20 +210,27 @@ async def ask_insightx(request: QueryRequest):
         intent = intent_check.choices[0].message.content.strip().upper()
 
         if not intent.startswith("YES"):
-            # Not a data question â€” return a friendly conversational response
+            # Not a data question -- return a friendly conversational response
+            # Include chat history so the bot can remember names, prior context, etc.
+            history_msgs = [
+                {"role": msg.role, "content": msg.content}
+                for msg in request.chat_history[-10:]
+            ]
             chat_reply = groq_client.chat.completions.create(
                 model=GROQ_MODEL,
-                messages=[{
-                    "role": "system",
-                    "content": (
-                        "You are InsightX, an AI assistant for UPI transaction analytics. "
-                        "If the user sends a greeting or off-topic message, reply briefly and "
-                        "guide them to ask a data question. Keep it friendly and concise."
-                    )
-                }, {
-                    "role": "user",
-                    "content": question,
-                }],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are InsightX, an AI assistant for UPI transaction analytics. "
+                            "You remember everything the user has told you in this conversation. "
+                            "If the user sends a greeting or off-topic message, reply briefly and "
+                            "guide them to ask a data question. Keep it friendly and concise."
+                        ),
+                    },
+                    *history_msgs,
+                    {"role": "user", "content": question},
+                ],
                 temperature=0.7,
                 max_tokens=150,
             )
@@ -239,6 +246,7 @@ async def ask_insightx(request: QueryRequest):
                     "What are the top 5 transactions by amount?",
                 ],
             }
+
 
         # -- Step A: Vanna AI -- Generate SQL & Execute -----------------------
         generated_sql = vn.generate_sql(question)
