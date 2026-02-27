@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown } from "lucide-react";
+import React from "react";
 import {
   LineChart,
   Line,
@@ -12,166 +12,265 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
+// -- Types --------------------------------------------------------------------
+
 interface DataVisualizerProps {
-  data: {
-    type: "kpi" | "chart" | "table" | "text";
-    value?: string;
-    change?: string;
-    changeDirection?: "up" | "down";
-    chartType?: "line" | "bar" | "pie";
-    data?: Array<{ name: string; value: number }>;
-    columns?: string[];
-    rows?: string[][];
-    content?: string;
-  };
+  /** Raw data rows from the backend (array of objects) */
+  data: Record<string, unknown>[];
+  /** LLM-chosen chart type */
+  chartType: string;
+  /** Column name for X-axis / label */
+  xAxis: string | null;
+  /** Column name for Y-axis / value */
+  yAxis: string | null;
+  /** Optional: for text-only fallback */
+  textContent?: string;
 }
 
+// -- Dark-mode color palette --------------------------------------------------
+
 const CHART_COLORS = [
-  "hsl(174, 70%, 45%)",
-  "hsl(250, 80%, 62%)",
-  "hsl(200, 70%, 55%)",
-  "hsl(280, 65%, 55%)",
-  "hsl(140, 60%, 45%)",
-  "hsl(30, 80%, 55%)",
+  "#8b5cf6", // violet-500
+  "#3b82f6", // blue-500
+  "#10b981", // emerald-500
+  "#f59e0b", // amber-500
+  "#f43f5e", // rose-500
+  "#06b6d4", // cyan-500
+  "#a78bfa", // violet-400
+  "#60a5fa", // blue-400
 ];
 
-const DataVisualizer = ({ data }: DataVisualizerProps) => {
-  if (data.type === "kpi") {
+const TOOLTIP_STYLE: React.CSSProperties = {
+  background: "rgba(15, 23, 42, 0.95)",
+  border: "1px solid rgba(148, 163, 184, 0.2)",
+  borderRadius: "10px",
+  color: "#e2e8f0",
+  fontSize: "13px",
+  padding: "10px 14px",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+};
+
+const AXIS_TICK = { fill: "#94a3b8", fontSize: 12 };
+const GRID_STROKE = "rgba(148, 163, 184, 0.08)";
+
+// -- Helpers ------------------------------------------------------------------
+
+function formatValue(val: unknown): string {
+  if (val === null || val === undefined) return "\u2014";
+  if (typeof val === "number") return val.toLocaleString("en-IN");
+  return String(val);
+}
+
+function isCurrencyKey(key: string): boolean {
+  return /amount|value|total|sum|credit|debit|inr|revenue|cost/i.test(key);
+}
+
+function formatCell(key: string, val: unknown): string {
+  if (val === null || val === undefined) return "\u2014";
+  if (typeof val === "number") {
+    const formatted = val.toLocaleString("en-IN");
+    return isCurrencyKey(key) ? `\u20b9${formatted}` : formatted;
+  }
+  return String(val);
+}
+
+// -- Component ----------------------------------------------------------------
+
+const DataVisualizer: React.FC<DataVisualizerProps> = ({
+  data,
+  chartType,
+  xAxis,
+  yAxis,
+  textContent,
+}) => {
+  // Guard: no data
+  if (!data || data.length === 0) {
+    if (textContent) {
+      return (
+        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+          {textContent}
+        </p>
+      );
+    }
+    return null;
+  }
+
+  // ── KPI ─────────────────────────────────────────────────────────────────────
+  if (chartType === "kpi" || data.length === 1) {
+    const row = data[0];
+    const keys = Object.keys(row);
+    // Try to show label + value, or just the single value
+    const labelKey = keys.length > 1 ? keys[0] : null;
+    const valueKey = yAxis || keys[keys.length - 1];
+    const rawValue = row[valueKey];
+
     return (
-      <div className="flex flex-col items-center py-4">
-        <span className="text-4xl md:text-5xl font-bold text-kpi">{data.value}</span>
-        {data.change && (
-          <div
-            className={`flex items-center gap-1 mt-2 text-sm font-medium ${
-              data.changeDirection === "up" ? "text-accent" : "text-destructive"
-            }`}
-          >
-            {data.changeDirection === "up" ? (
-              <TrendingUp className="w-4 h-4" />
-            ) : (
-              <TrendingDown className="w-4 h-4" />
-            )}
-            {data.change} vs last month
-          </div>
+      <div className="flex flex-col items-center justify-center py-6 px-4">
+        {labelKey && (
+          <span className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+            {String(row[labelKey])}
+          </span>
         )}
+        <span className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
+          {typeof rawValue === "number" && isCurrencyKey(valueKey)
+            ? `\u20b9${rawValue.toLocaleString("en-IN")}`
+            : formatValue(rawValue)}
+        </span>
+        <span className="text-xs text-muted-foreground mt-2 uppercase tracking-wider">
+          {valueKey.replace(/_/g, " ")}
+        </span>
       </div>
     );
   }
 
-  if (data.type === "chart" && data.data) {
+  // ── Charts (bar/line/pie) ───────────────────────────────────────────────────
+  if (
+    (chartType === "bar" || chartType === "line" || chartType === "pie") &&
+    xAxis &&
+    yAxis
+  ) {
+    // Ensure numeric y-axis values
+    const chartData = data.map((row) => ({
+      ...row,
+      [yAxis]: typeof row[yAxis] === "number" ? row[yAxis] : Number(row[yAxis]) || 0,
+    }));
+
     return (
-      <div className="w-full h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          {data.chartType === "bar" ? (
-            <BarChart data={data.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(228, 15%, 18%)" />
-              <XAxis dataKey="name" tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 12 }} />
-              <YAxis tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(228, 20%, 10%)",
-                  border: "1px solid hsl(228, 15%, 22%)",
-                  borderRadius: "8px",
-                  color: "hsl(210, 40%, 93%)",
-                }}
+      <div className="w-full bg-slate-900/50 border border-slate-800/60 rounded-xl p-4">
+        <ResponsiveContainer width="100%" height={400}>
+          {chartType === "bar" ? (
+            <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <XAxis
+                dataKey={xAxis}
+                tick={AXIS_TICK}
+                axisLine={{ stroke: "rgba(148,163,184,0.15)" }}
+                tickLine={false}
               />
-              <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
+              <YAxis
+                tick={AXIS_TICK}
+                axisLine={{ stroke: "rgba(148,163,184,0.15)" }}
+                tickLine={false}
+                tickFormatter={(v: number) => v.toLocaleString("en-IN")}
+              />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                formatter={(value: number) => [value.toLocaleString("en-IN"), yAxis.replace(/_/g, " ")]}
+                cursor={{ fill: "rgba(148, 163, 184, 0.06)" }}
+              />
+              <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
+              <Bar
+                dataKey={yAxis}
+                fill={CHART_COLORS[0]}
+                radius={[6, 6, 0, 0]}
+                name={yAxis.replace(/_/g, " ")}
+              />
             </BarChart>
-          ) : data.chartType === "pie" ? (
+          ) : chartType === "line" ? (
+            <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <XAxis
+                dataKey={xAxis}
+                tick={AXIS_TICK}
+                axisLine={{ stroke: "rgba(148,163,184,0.15)" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={AXIS_TICK}
+                axisLine={{ stroke: "rgba(148,163,184,0.15)" }}
+                tickLine={false}
+                tickFormatter={(v: number) => v.toLocaleString("en-IN")}
+              />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                formatter={(value: number) => [value.toLocaleString("en-IN"), yAxis.replace(/_/g, " ")]}
+              />
+              <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
+              <Line
+                type="monotone"
+                dataKey={yAxis}
+                stroke={CHART_COLORS[0]}
+                strokeWidth={2.5}
+                dot={{ fill: CHART_COLORS[0], strokeWidth: 0, r: 4 }}
+                activeDot={{ r: 7, fill: CHART_COLORS[0], stroke: "#fff", strokeWidth: 2 }}
+                name={yAxis.replace(/_/g, " ")}
+              />
+            </LineChart>
+          ) : (
+            // Pie chart
             <PieChart>
               <Pie
-                data={data.data}
+                data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={50}
-                outerRadius={80}
-                dataKey="value"
+                innerRadius={60}
+                outerRadius={120}
+                dataKey={yAxis}
+                nameKey={xAxis}
                 stroke="none"
+                paddingAngle={2}
+                label={({ name, percent }: { name: string; percent: number }) =>
+                  `${name} (${(percent * 100).toFixed(1)}%)`
+                }
+                labelLine={{ stroke: "#94a3b8", strokeWidth: 1 }}
               >
-                {data.data.map((_, i) => (
+                {chartData.map((_, i) => (
                   <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{
-                  background: "hsl(228, 20%, 10%)",
-                  border: "1px solid hsl(228, 15%, 22%)",
-                  borderRadius: "8px",
-                  color: "hsl(210, 40%, 93%)",
-                }}
+                contentStyle={TOOLTIP_STYLE}
+                formatter={(value: number) => [value.toLocaleString("en-IN"), yAxis.replace(/_/g, " ")]}
               />
+              <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
             </PieChart>
-          ) : (
-            <LineChart data={data.data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(228, 15%, 18%)" />
-              <XAxis dataKey="name" tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 12 }} />
-              <YAxis tick={{ fill: "hsl(215, 15%, 55%)", fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(228, 20%, 10%)",
-                  border: "1px solid hsl(228, 15%, 22%)",
-                  borderRadius: "8px",
-                  color: "hsl(210, 40%, 93%)",
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={CHART_COLORS[0]}
-                strokeWidth={2}
-                dot={{ fill: CHART_COLORS[0], strokeWidth: 0, r: 4 }}
-                activeDot={{ r: 6, fill: CHART_COLORS[0] }}
-              />
-            </LineChart>
           )}
         </ResponsiveContainer>
       </div>
     );
   }
 
-  if (data.type === "table" && data.columns && data.rows) {
-    return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border/50">
-              {data.columns.map((col) => (
-                <th
+  // ── Table Fallback ──────────────────────────────────────────────────────────
+  const columns = Object.keys(data[0]);
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-700/60">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-slate-800/80">
+            {columns.map((col) => (
+              <th
+                key={col}
+                className="text-left px-4 py-3 text-slate-300 font-medium text-xs uppercase tracking-wider whitespace-nowrap"
+              >
+                {col.replace(/_/g, " ")}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr
+              key={i}
+              className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors"
+            >
+              {columns.map((col) => (
+                <td
                   key={col}
-                  className="text-left px-3 py-2 text-muted-foreground font-medium text-xs uppercase tracking-wider"
+                  className="px-4 py-2.5 text-foreground whitespace-nowrap"
                 >
-                  {col}
-                </th>
+                  {formatCell(col, row[col])}
+                </td>
               ))}
             </tr>
-          </thead>
-          <tbody>
-            {data.rows.map((row, i) => (
-              <tr key={i} className="border-b border-border/20 hover:bg-secondary/30 transition-colors">
-                {row.map((cell, j) => (
-                  <td key={j} className="px-3 py-2.5 text-foreground">
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (data.type === "text") {
-    return (
-      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-        {data.content}
-      </p>
-    );
-  }
-
-  return null;
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 };
 
 export default DataVisualizer;

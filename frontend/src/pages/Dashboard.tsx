@@ -10,7 +10,6 @@ import {
   askQuestion,
   voiceAsk,
   ocrAsk,
-  dataToTable,
   createSession,
   getSessionMessages,
   type ApiResponse,
@@ -20,14 +19,15 @@ import {
 // -- Helpers ------------------------------------------------------------------
 
 function apiResponseToMessageData(res: ApiResponse): Message["data"] {
-  const tableData = dataToTable(res.data);
+  const hasData = res.data && res.data.length > 0;
   return {
-    type: tableData ? "table" : "text",
     title: "InsightX Analysis",
     summary: res.answer,
-    ...(tableData
-      ? { columns: tableData.columns, rows: tableData.rows }
-      : { content: res.answer }),
+    rawData: hasData ? res.data : undefined,
+    chartType: res.chart_type ?? (hasData ? "table" : "text"),
+    xAxis: res.x_axis ?? null,
+    yAxis: res.y_axis ?? null,
+    textContent: !hasData ? res.answer : undefined,
     sql: res.sql,
     followUpQuestions: res.follow_up_questions,
   };
@@ -94,14 +94,15 @@ const Dashboard = () => {
           try {
             const full = typeof m.data === "string" ? JSON.parse(m.data) : m.data;
             if (full && full.answer) {
-              const tableData = dataToTable(full.data ?? []);
+              const hasData = full.data && full.data.length > 0;
               data = {
-                type: tableData ? "table" : "text",
                 title: "InsightX Analysis",
                 summary: full.answer,
-                ...(tableData
-                  ? { columns: tableData.columns, rows: tableData.rows }
-                  : { content: full.answer }),
+                rawData: hasData ? full.data : undefined,
+                chartType: full.chart_type ?? (hasData ? "table" : "text"),
+                xAxis: full.x_axis ?? null,
+                yAxis: full.y_axis ?? null,
+                textContent: !hasData ? full.answer : undefined,
                 sql: full.sql ?? m.sql_text ?? "",
                 followUpQuestions: full.follow_up_questions ?? [],
               };
@@ -111,10 +112,12 @@ const Dashboard = () => {
           }
           if (!data) {
             data = {
-              type: "text",
               title: "InsightX Analysis",
               summary: m.content,
-              content: m.content,
+              textContent: m.content,
+              chartType: "text",
+              xAxis: null,
+              yAxis: null,
             };
           }
           return {

@@ -184,7 +184,15 @@ Task 2: Suggest exactly 3 follow-up questions. STRICT RULES:
 - Do NOT invent columns, tables, or data that are not in the schema.
 - Questions should be a natural, different-angle continuation of the current analysis.
 
-Return valid JSON with exactly these keys: "answer" (string), "follow_up_questions" (list of 3 strings)."""
+Task 3: Decide the best way to visualize this data. Choose ONE chart type:
+- "bar" for comparing categories (e.g. banks, transaction types)
+- "line" for time series or trends over ordered values
+- "pie" for showing proportions or distributions of a whole
+- "kpi" for a single numeric result (e.g. total count, average)
+- "table" for complex multi-column data or raw listings
+Provide the column name to use for the X-axis (or label) and the column name for the Y-axis (or value). Use null if not applicable.
+
+Return valid JSON with exactly these keys: "answer" (string), "follow_up_questions" (list of 3 strings), "chart_type" (string), "x_axis" (string or null), "y_axis" (string or null)."""
 
 
 # -- Core Endpoint: /api/ask ---------------------------------------------------
@@ -334,6 +342,9 @@ async def ask_insightx(request: QueryRequest):
 
         answer = llm_result.get("answer", raw_content)
         follow_ups = llm_result.get("follow_up_questions", [])[:3]
+        chart_type = llm_result.get("chart_type", "table")
+        x_axis = llm_result.get("x_axis")
+        y_axis = llm_result.get("y_axis")
 
         # -- Step E: Persist to DB & Return ------------------------------------
         response_payload = {
@@ -342,6 +353,9 @@ async def ask_insightx(request: QueryRequest):
             "data": data_dict,
             "answer": answer,
             "follow_up_questions": follow_ups,
+            "chart_type": chart_type,
+            "x_axis": x_axis,
+            "y_axis": y_axis,
         }
 
         if request.session_id:

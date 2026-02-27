@@ -9,6 +9,9 @@ export interface ApiResponse {
     data: Record<string, unknown>[];
     answer: string;
     follow_up_questions: string[];
+    chart_type?: string;
+    x_axis?: string | null;
+    y_axis?: string | null;
     transcription?: string;
     ocr_text?: string;
     original_question?: string;

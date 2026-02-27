@@ -7,21 +7,16 @@ export interface Message {
   role: "user" | "ai";
   content: string;
   data?: {
-    type: "kpi" | "chart" | "table" | "text";
     title: string;
     summary?: string;
-    // KPI
-    value?: string;
-    change?: string;
-    changeDirection?: "up" | "down";
-    // Chart
-    chartType?: "line" | "bar" | "pie";
-    data?: Array<{ name: string; value: number }>;
-    // Table
-    columns?: string[];
-    rows?: string[][];
-    // Text
-    content?: string;
+    // Raw data from backend
+    rawData?: Record<string, unknown>[];
+    // LLM-chosen visualization
+    chartType?: string;
+    xAxis?: string | null;
+    yAxis?: string | null;
+    // Text-only content
+    textContent?: string;
     // SQL (collapsible detail)
     sql?: string;
     // Follow-up questions
@@ -81,12 +76,25 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
                     <Download className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <DataVisualizer data={message.data} />
-                {message.data.summary && message.data.type !== "text" && (
-                  <p className="text-sm text-muted-foreground pt-2 border-t border-border/30">
-                    {message.data.summary}
-                  </p>
-                )}
+
+                {/* Dynamic Data Visualizer */}
+                <DataVisualizer
+                  data={message.data.rawData ?? []}
+                  chartType={message.data.chartType ?? "table"}
+                  xAxis={message.data.xAxis ?? null}
+                  yAxis={message.data.yAxis ?? null}
+                  textContent={message.data.textContent}
+                />
+
+                {/* Summary (for non-text chart types) */}
+                {message.data.summary &&
+                  message.data.chartType !== "text" &&
+                  (message.data.rawData?.length ?? 0) > 0 && (
+                    <p className="text-sm text-muted-foreground pt-2 border-t border-border/30">
+                      {message.data.summary}
+                    </p>
+                  )}
+
                 {/* Follow-up questions */}
                 {message.data.followUpQuestions && message.data.followUpQuestions.length > 0 && (
                   <div className="pt-2 border-t border-border/30">
@@ -104,6 +112,7 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
                     </div>
                   </div>
                 )}
+
                 {/* SQL Disclosure */}
                 {message.data.sql && (
                   <details className="pt-1">
