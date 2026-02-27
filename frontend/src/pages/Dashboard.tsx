@@ -5,6 +5,7 @@ import { Send, Mic, MicOff, ImagePlus, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import ChatMessage, { type Message } from "@/components/ChatMessage";
+import { ReportTemplate } from "@/components/ReportTemplate";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   askQuestion,
@@ -280,7 +281,7 @@ const Dashboard = () => {
   // -- PDF Export --------------------------------------------------------------
 
   const exportToPDF = async () => {
-    const element = document.getElementById("insightx-report-container");
+    const element = document.getElementById("insightx-corporate-report");
     if (!element) {
       toast.error("Nothing to export yet.");
       return;
@@ -288,23 +289,13 @@ const Dashboard = () => {
 
     toast.info("Generating PDF report…");
 
-    // Hide elements that shouldn't appear in the PDF
-    const style = document.createElement("style");
-    style.id = "pdf-export-styles";
-    style.textContent = `
-      .pdf-exclude { display: none !important; }
-      #insightx-input-area { display: none !important; }
-      #insightx-report-container { overflow: visible !important; height: auto !important; }
-    `;
-    document.head.appendChild(style);
-
     try {
       const html2pdf = (await import("html2pdf.js")).default;
       const opt = {
-        margin: [0.4, 0.4, 0.4, 0.4],
+        margin: [0.4, 0.4, 0.4, 0.4] as [number, number, number, number],
         filename: "InsightX_Executive_Report.pdf",
         image: { type: "jpeg" as const, quality: 1.0 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#0f172a", letterRendering: true },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", letterRendering: true },
         jsPDF: { unit: "in" as const, format: "a4", orientation: "portrait" as const },
         pagebreak: { mode: ["css", "legacy"], avoid: ".print-avoid-break" },
       };
@@ -313,8 +304,6 @@ const Dashboard = () => {
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate PDF.");
-    } finally {
-      document.getElementById("pdf-export-styles")?.remove();
     }
   };
 
@@ -413,35 +402,31 @@ const Dashboard = () => {
               {selectedImage && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/60 w-fit text-sm text-muted-foreground border border-border/40">
                   <ImagePlus className="w-3.5 h-3.5" />
-                  <span className="max-w-[200px] truncate">{selectedImage.name}</span>
-                  <button onClick={() => setSelectedImage(null)} className="ml-1 hover:text-foreground">
-                    <X className="w-3 h-3" />
+                  <span className="truncate max-w-[200px] font-medium">{selectedImage.name}</span>
+                  <button
+                    onClick={() => {
+                      setSelectedImage(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    className="p-1 hover:bg-background rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
 
-              <div className="glass-card flex items-center gap-2 px-4 py-2">
+              <div className="relative flex items-center gap-2 bg-secondary/40 border border-border/50 rounded-2xl p-2 backdrop-blur-md shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/30 transition-all">
                 <button
                   onClick={toggleRecording}
-                  disabled={isLoading}
-                  className={`relative p-2.5 rounded-xl transition-all ${isRecording ? "bg-accent/20 text-accent" : "text-muted-foreground hover:text-foreground hover:bg-secondary"} disabled:opacity-40`}
-                  title={isRecording ? "Stop recording" : "Start voice query"}
+                  disabled={isLoading || !!selectedImage}
+                  className={`p-2.5 rounded-xl transition-all ${isRecording
+                    ? "bg-red-500/10 text-red-500 hover:bg-red-500/20 glow-pulse"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-40"
+                    }`}
+                  title={isRecording ? "Stop recording" : "Use voice input"}
                 >
-                  {isRecording && <span className="pulse-ring" />}
-                  {isRecording ? <MicOff className="w-5 h-5 relative z-10" /> : <Mic className="w-5 h-5" />}
+                  {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                 </button>
-
-                {isRecording && (
-                  <div className="flex items-center gap-1 px-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-1 bg-accent rounded-full"
-                        style={{ animation: `waveform 0.6s ease-in-out ${i * 0.1}s infinite`, height: "4px" }}
-                      />
-                    ))}
-                  </div>
-                )}
 
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -453,15 +438,35 @@ const Dashboard = () => {
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/bmp" className="hidden" onChange={handleImageChange} />
 
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder={selectedImage ? "Add context or press send to analyse the image\u2026" : "Ask about your transaction history\u2026"}
-                  disabled={isRecording}
-                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm py-2 disabled:opacity-40"
-                />
+                {isRecording ? (
+                  <div className="flex-1 flex items-center px-4 overflow-hidden h-10">
+                    <span className="text-red-500 font-medium text-sm animate-pulse mr-3 whitespace-nowrap">
+                      Recording...
+                    </span>
+                    <div className="flex-1 flex items-center h-full gap-1 flex-nowrap overflow-hidden">
+                      {Array.from({ length: 40 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="w-1.5 bg-red-400 rounded-full animate-waveform opacity-80"
+                          style={{
+                            height: `${Math.max(10, Math.random() * 100)}%`,
+                            animationDelay: `${Math.random() * 0.5}s`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                    placeholder={selectedImage ? "Add context or press send to analyse the image…" : "Ask about your transaction history…"}
+                    disabled={isRecording}
+                    className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm py-2 disabled:opacity-40"
+                  />
+                )}
 
                 <button
                   onClick={handleSend}
@@ -474,6 +479,11 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Invisible wrapper for PDF Generation */}
+      <div className="fixed top-0 left-[-9999px] z-[-1] invisible">
+        <ReportTemplate messages={messages} />
       </div>
     </SidebarProvider>
   );
