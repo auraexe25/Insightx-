@@ -175,7 +175,11 @@ The database returned this exact data:
 {schema}
 --- END SCHEMA ---
 
-Task 1: Write a concise, highly professional executive summary (2-3 sentences). Include rupee symbols (₹).
+Task 1: Write a concise, highly professional executive summary (2-3 sentences).
+STRICT RULES FOR SUMMARY:
+- ALWAYS include rupee symbols (₹) for monetary values.
+- NEVER invent, hallucinate, or assume numbers, units, or facts not explicitly in the data table (e.g., do NOT say "crores" or "millions" unless the data explicitly says so).
+- NEVER add generic fluff like "This analysis can help identify trends..." or "This indicates a preference...". Just state the facts.
 
 Task 2: Suggest exactly 3 logical follow-up questions. STRICT RULES:
 - Every question MUST be answerable using only the columns and values listed in the schema.
