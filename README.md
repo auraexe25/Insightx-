@@ -55,9 +55,8 @@
 
 ## 🏗️ Architecture
 ![Image](https://github.com/user-attachments/assets/3804dfea-e7f9-4f21-8018-cd16d88a86e2)
-               └───────────────────────────┘
-```
-```
+              
+---
 
 
 ## 📂 Project Structure
