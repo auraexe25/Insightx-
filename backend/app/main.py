@@ -183,19 +183,18 @@ Task 2: Suggest exactly 3 logical follow-up questions. STRICT RULES:
 - Do NOT invent columns, tables, or data that are not in the schema.
 - Questions should be a natural, different-angle continuation of the current analysis.
 
-Task 3: Decide the best way to visualize this data. Choose ONE chart type: "bar", "line", "pie", "kpi", or "table".
+Task 3: Decide the best way to visualize this data. Choose ONE chart type: "bar", "line", "pie", or "kpi".
 STRICT RULES FOR CHARTS:
 - If the user's question contains words like "distribution", "breakdown", "share", or "percentage", you MUST output "pie".
 - If the data is a single number, output "kpi".
 - If the data shows a trend over time (days, hours, months), output "line".
 - If comparing categories (e.g., banks, states, network types) and it is NOT a distribution, output "bar".
-- ONLY output "table" if the data contains more than 2 columns (e.g., sender, receiver, and amount).
 
 You MUST return your response as a valid JSON object.
 Use exactly these keys:
 "answer" (string),
 "follow_up_questions" (list of strings),
-"chart_type" (string: "bar", "line", "pie", "kpi", or "table"),
+"chart_type" (string: "bar", "line", "pie", or "kpi"),
 "x_axis" (string: the EXACT column name from the data to use as the X-axis label/category. E.g., 'NETWORK TYPE'),
 "y_axis" (string: the EXACT column name from the data to use as the Y-axis value. E.g., 'TXN COUNT')"""
 
