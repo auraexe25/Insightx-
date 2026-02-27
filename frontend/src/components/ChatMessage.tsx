@@ -97,7 +97,7 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
 
                 {/* Follow-up questions */}
                 {message.data.followUpQuestions && message.data.followUpQuestions.length > 0 && (
-                  <div className="pt-2 border-t border-border/30">
+                  <div className="pdf-exclude pt-2 border-t border-border/30">
                     <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">Suggested follow-ups</p>
                     <div className="flex flex-wrap gap-2">
                       {message.data.followUpQuestions.map((q) => (
@@ -115,7 +115,7 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
 
                 {/* SQL Disclosure */}
                 {message.data.sql && (
-                  <details className="pt-1">
+                  <details className="pdf-exclude pt-1">
                     <summary className="text-xs text-muted-foreground/60 cursor-pointer hover:text-muted-foreground transition-colors">
                       View SQL
                     </summary>
