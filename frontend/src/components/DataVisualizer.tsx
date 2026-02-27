@@ -114,7 +114,7 @@ const DataVisualizer: React.FC<DataVisualizerProps> = ({
             {String(row[labelKey])}
           </span>
         )}
-        <span className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
+        <span className="text-6xl font-extrabold text-cyan-400 drop-shadow-md">
           {typeof rawValue === "number" && isCurrencyKey(valueKey)
             ? `\u20b9${rawValue.toLocaleString("en-IN")}`
             : formatValue(rawValue)}

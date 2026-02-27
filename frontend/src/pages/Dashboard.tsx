@@ -301,11 +301,12 @@ const Dashboard = () => {
     try {
       const html2pdf = (await import("html2pdf.js")).default;
       const opt = {
-        margin: 0.5,
+        margin: [0.4, 0.4, 0.4, 0.4],
         filename: "InsightX_Executive_Report.pdf",
-        image: { type: "jpeg" as const, quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#0f172a" },
-        jsPDF: { unit: "in" as const, format: "letter", orientation: "portrait" as const },
+        image: { type: "jpeg" as const, quality: 1.0 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#0f172a", letterRendering: true },
+        jsPDF: { unit: "in" as const, format: "a4", orientation: "portrait" as const },
+        pagebreak: { mode: ["css", "legacy"], avoid: ".print-avoid-break" },
       };
       await html2pdf().set(opt).from(element).save();
       toast.success("Report downloaded!");

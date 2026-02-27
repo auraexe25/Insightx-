@@ -49,7 +49,7 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex gap-3 ${isUser ? "justify-end" : "items-start"}`}
+      className={`flex gap-3 print-avoid-break break-inside-avoid ${isUser ? "justify-end" : "items-start"}`}
     >
       {!isUser && (
         <div className="w-8 h-8 rounded-lg glow-button flex items-center justify-center text-[10px] font-bold shrink-0 mt-1">
