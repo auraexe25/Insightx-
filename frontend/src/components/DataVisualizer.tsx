@@ -126,16 +126,46 @@ const DataVisualizer: React.FC<DataVisualizerProps> = ({
     );
   }
 
+  // ── Column Resolution (handles LLM vs data key mismatches) ────────────────
+  const dataKeys = Object.keys(data[0]);
+
+  function resolveColumn(name: string | null): string | null {
+    if (!name) return null;
+    // 1. Exact match
+    if (dataKeys.includes(name)) return name;
+    // 2. Case-insensitive match
+    const lower = name.toLowerCase();
+    const ciMatch = dataKeys.find((k) => k.toLowerCase() === lower);
+    if (ciMatch) return ciMatch;
+    // 3. Normalized match (strip spaces/underscores, lowercase)
+    const normalize = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
+    const normMatch = dataKeys.find((k) => normalize(k) === normalize(name));
+    if (normMatch) return normMatch;
+    return null;
+  }
+
+  let resolvedX = resolveColumn(xAxis);
+  let resolvedY = resolveColumn(yAxis);
+
+  // Auto-detect if LLM chose a chart but axes didn't resolve
+  const isChartType = chartType === "bar" || chartType === "line" || chartType === "pie";
+  if (isChartType && (!resolvedX || !resolvedY) && dataKeys.length >= 2) {
+    // First column = labels, first numeric column = values
+    if (!resolvedX) resolvedX = dataKeys[0];
+    if (!resolvedY) {
+      const numericKey = dataKeys.find(
+        (k) => k !== resolvedX && typeof data[0][k] === "number"
+      );
+      resolvedY = numericKey ?? dataKeys[1];
+    }
+  }
+
   // ── Charts (bar/line/pie) ───────────────────────────────────────────────────
-  if (
-    (chartType === "bar" || chartType === "line" || chartType === "pie") &&
-    xAxis &&
-    yAxis
-  ) {
+  if (isChartType && resolvedX && resolvedY) {
     // Ensure numeric y-axis values
     const chartData = data.map((row) => ({
       ...row,
-      [yAxis]: typeof row[yAxis] === "number" ? row[yAxis] : Number(row[yAxis]) || 0,
+      [resolvedY!]: typeof row[resolvedY!] === "number" ? row[resolvedY!] : Number(row[resolvedY!]) || 0,
     }));
 
     return (
@@ -145,7 +175,7 @@ const DataVisualizer: React.FC<DataVisualizerProps> = ({
             <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
               <XAxis
-                dataKey={xAxis}
+                dataKey={resolvedX}
                 tick={AXIS_TICK}
                 axisLine={{ stroke: "rgba(148,163,184,0.15)" }}
                 tickLine={false}
@@ -158,22 +188,22 @@ const DataVisualizer: React.FC<DataVisualizerProps> = ({
               />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
-                formatter={(value: number) => [value.toLocaleString("en-IN"), yAxis.replace(/_/g, " ")]}
+                formatter={(value: number) => [value.toLocaleString("en-IN"), resolvedY!.replace(/_/g, " ")]}
                 cursor={{ fill: "rgba(148, 163, 184, 0.06)" }}
               />
               <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
               <Bar
-                dataKey={yAxis}
+                dataKey={resolvedY!}
                 fill={CHART_COLORS[0]}
                 radius={[6, 6, 0, 0]}
-                name={yAxis.replace(/_/g, " ")}
+                name={resolvedY!.replace(/_/g, " ")}
               />
             </BarChart>
           ) : chartType === "line" ? (
             <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
               <XAxis
-                dataKey={xAxis}
+                dataKey={resolvedX}
                 tick={AXIS_TICK}
                 axisLine={{ stroke: "rgba(148,163,184,0.15)" }}
                 tickLine={false}
@@ -186,17 +216,17 @@ const DataVisualizer: React.FC<DataVisualizerProps> = ({
               />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
-                formatter={(value: number) => [value.toLocaleString("en-IN"), yAxis.replace(/_/g, " ")]}
+                formatter={(value: number) => [value.toLocaleString("en-IN"), resolvedY!.replace(/_/g, " ")]}
               />
               <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
               <Line
                 type="monotone"
-                dataKey={yAxis}
+                dataKey={resolvedY!}
                 stroke={CHART_COLORS[0]}
                 strokeWidth={2.5}
                 dot={{ fill: CHART_COLORS[0], strokeWidth: 0, r: 4 }}
                 activeDot={{ r: 7, fill: CHART_COLORS[0], stroke: "#fff", strokeWidth: 2 }}
-                name={yAxis.replace(/_/g, " ")}
+                name={resolvedY!.replace(/_/g, " ")}
               />
             </LineChart>
           ) : (
@@ -208,8 +238,8 @@ const DataVisualizer: React.FC<DataVisualizerProps> = ({
                 cy="50%"
                 innerRadius={60}
                 outerRadius={120}
-                dataKey={yAxis}
-                nameKey={xAxis}
+                dataKey={resolvedY!}
+                nameKey={resolvedX!}
                 stroke="none"
                 paddingAngle={2}
                 label={({ name, percent }: { name: string; percent: number }) =>
@@ -223,7 +253,7 @@ const DataVisualizer: React.FC<DataVisualizerProps> = ({
               </Pie>
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
-                formatter={(value: number) => [value.toLocaleString("en-IN"), yAxis.replace(/_/g, " ")]}
+                formatter={(value: number) => [value.toLocaleString("en-IN"), resolvedY!.replace(/_/g, " ")]}
               />
               <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
             </PieChart>
