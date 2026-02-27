@@ -2,6 +2,12 @@ import { motion } from "framer-motion";
 import { ArrowRight, Mic, Shield, Workflow } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroBg from "@/assets/hero-bg.jpg";
+import SectionWrapper from "@/components/landing/SectionWrapper";
+import LiveDemo from "@/components/landing/LiveDemo";
+import HowItWorks from "@/components/landing/HowItWorks";
+import UseCases from "@/components/landing/UseCases";
+import FAQ from "@/components/landing/FAQ";
+import Footer from "@/components/landing/Footer";
 
 const features = [
   {
@@ -58,7 +64,6 @@ const Index = () => {
           transition={{ duration: 0.6 }}
           className="max-w-4xl"
         >
-        
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6">
             Ask Questions.{" "}
             <span className="gradient-text">Get Instant Financial Insights.</span>
@@ -77,18 +82,19 @@ const Index = () => {
       </section>
 
       {/* Features Grid */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
-        <div className="grid md:grid-cols-3 gap-6">
+      <SectionWrapper>
+        <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-6">
           {features.map((feature, i) => (
             <motion.div
               key={feature.title}
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 + i * 0.1 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
               className="glass-card-hover p-6"
             >
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <feature.icon className="w-6 h-6 text-accent" />
+                <feature.icon className="w-6 h-6 text-accent-foreground" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
                 {feature.title}
@@ -99,7 +105,42 @@ const Index = () => {
             </motion.div>
           ))}
         </div>
-      </section>
+      </SectionWrapper>
+
+      {/* Live Demo */}
+      <SectionWrapper
+        title="See it in action."
+        subtitle="Click a prompt to watch InsightX transform natural language into visual insights — instantly."
+      >
+        <LiveDemo />
+      </SectionWrapper>
+
+      {/* How It Works */}
+      <SectionWrapper
+        title="From natural language to deep insights."
+        subtitle="Three simple steps. Zero SQL knowledge required."
+      >
+        <HowItWorks />
+      </SectionWrapper>
+
+      {/* Use Cases */}
+      <SectionWrapper
+        title="Built for everyone."
+        subtitle="Whether you're tracking personal expenses or managing business payments."
+      >
+        <UseCases />
+      </SectionWrapper>
+
+      {/* FAQ */}
+      <SectionWrapper
+        title="Frequently asked questions."
+        subtitle="Everything you need to know about InsightX."
+      >
+        <FAQ />
+      </SectionWrapper>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };
