@@ -54,49 +54,11 @@
 ---
 
 ## 🏗️ Architecture
-
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                            USER INPUT                               │
-│              Text  /  Voice (Whisper)  /  Image (OCR)               │
-└─────────────────────────────────┬───────────────────────────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │    Intent Guardrail       │
-                    │  (Groq Classification)    │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │    Vanna AI Pipeline      │
-                    │  (Vector DB + Prompts)    │
-                    │    → Generates SQL        │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │   SQLite Execution        │
-                    │  (upi_transactions.db)    │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │  Groq (LLaMA-3 70B)       │
-                    │  • Executive Summary      │
-                    │  • Visualization Choice   │
-                    │  • Targeted Follow-ups    │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │   Chat History DB         │
-                    │   (chat_history.db)       │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │  React.js Dashboard       │
-                    │  • Recharts Visuals       │
-                    │  • PDF Report Generation  │
-                    └───────────────────────────┘
+![Image](https://github.com/user-attachments/assets/3804dfea-e7f9-4f21-8018-cd16d88a86e2)
+               └───────────────────────────┘
 ```
 
----
+
 
 ## 📂 Project Structure
 
