@@ -20,18 +20,19 @@
 ---
 
 ## 📸 Demo Showcase
+<img width="1901" height="970" alt="Image" src="https://github.com/user-attachments/assets/c0093ecb-19c0-4fb4-8c41-f52f31caa575" />
 
-> *Add high-quality screenshots or GIFs of your running application here.*
+<img width="1919" height="975" alt="Image" src="https://github.com/user-attachments/assets/dcb43cf5-920f-4bc1-81c6-8ea906d3e785" />
 
-<div align="center">
-  <img src="https://via.placeholder.com/800x450/0f172a/7c3aed?text=Screenshot:+Dashboard+Visualizations+(Charts,+KPIs)" alt="Dashboard Visualizations" width="48%" />
-  <img src="https://via.placeholder.com/800x450/0f172a/0ea5e9?text=Screenshot:+1-Click+Corporate+PDF+Board+Report" alt="PDF Export" width="48%" />
-</div>
-<br/>
-<div align="center">
-  <img src="https://via.placeholder.com/800x450/0f172a/10b981?text=Screenshot:+Voice+Query+&+OCR+Image+Upload" alt="Voice and OCR Input" width="48%" />
-  <img src="https://via.placeholder.com/800x450/0f172a/f59e0b?text=Screenshot:+Branded+Sidebar+&+Session+Management" alt="Sidebar and Themes" width="48%" />
-</div>
+<img width="1339" height="983" alt="Image" src="https://github.com/user-attachments/assets/7e604951-6cbf-4dd6-b389-8b2dfef7f9d2" />
+
+<img width="1395" height="975" alt="Image" src="https://github.com/user-attachments/assets/4a6e4964-6069-4682-904a-7188f3a14825" />
+
+<img width="1538" height="976" alt="Image" src="https://github.com/user-attachments/assets/177eb71a-ecb8-481f-b6a8-2dd16d5740a3" />
+
+
+
+
 
 ---
 
