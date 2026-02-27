@@ -59,6 +59,12 @@
               
 ---
 
+## User Flow Diagram
+![Image](https://github.com/user-attachments/assets/fc931330-242e-4012-8986-67bb210785a8)
+
+---
+
+
 
 ## 📂 Project Structure
 
