@@ -20,132 +20,207 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({ messages }) => {
         day: 'numeric'
     });
 
+    // Filter out user messages
+    const aiMessages = messages.filter(m => m.role === 'assistant' || m.role === 'ai');
+
+    // Helper to extract data
+    const processMessage = (msg: any, idx: number) => {
+        let userQuestion = "Insight";
+        const msgIndex = messages.findIndex(m => m.id === msg.id);
+        for (let i = msgIndex - 1; i >= 0; i--) {
+            if (messages[i].role === 'user') {
+                userQuestion = messages[i].content;
+                break;
+            }
+        }
+        if (userQuestion.startsWith('🎤 "')) {
+            userQuestion = userQuestion.replace('🎤 "', '').replace('"', '');
+        }
+
+        const data = msg.data;
+        if (!data) return null;
+
+        let chartType = data.chartType;
+        const chartData = data.rawData || [];
+        let resolvedX = data.xAxis;
+        let resolvedY = data.yAxis;
+
+        const isChartType = chartType === "bar" || chartType === "line" || chartType === "pie";
+
+        if (isChartType && chartData.length > 0) {
+            const dataKeys = Object.keys(chartData[0]);
+            if ((!resolvedX || !resolvedY) && dataKeys.length >= 2) {
+                if (!resolvedX) resolvedX = dataKeys[0];
+                if (!resolvedY) {
+                    const numericKey = dataKeys.find((k) => k !== resolvedX && typeof chartData[0][k] === "number");
+                    resolvedY = numericKey ?? dataKeys[1];
+                }
+            }
+        }
+
+        const isKpi = chartType === "kpi" || (chartType !== "text" && chartData.length === 1 && !isChartType);
+        if (isKpi) chartType = 'kpi';
+        // Treat tables as full width if not a chart or kpi
+        if (chartType === 'table' || (chartData.length > 1 && !isChartType)) chartType = 'table';
+
+        return { ...msg, userQuestion, chartType, chartData, resolvedX, resolvedY, summary: msg.content || data.summary };
+    };
+
+    const processedMessages = aiMessages.map(processMessage).filter(Boolean);
+
+    // Groupings
+    const kpiMessages = processedMessages.filter(m => m.chartType === 'kpi');
+    const gridCharts = processedMessages.filter(m => m.chartType === 'pie' || m.chartType === 'line');
+    const fullWidthCharts = processedMessages.filter(m => m.chartType === 'bar' || m.chartType === 'table');
+
     return (
-        <div id="insightx-corporate-report" className="bg-white text-slate-900 p-10 w-[800px] mx-auto font-sans">
-            <header className="border-b-2 border-slate-200 pb-4 mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">InsightX Executive Summary</h1>
-                <p className="text-sm text-slate-500 mt-2">Generated on: {date}</p>
-            </header>
+        <>
+            <style>{`
+        @media print {
+          body { -webkit-print-color-adjust: exact; }
+          #insightx-corporate-report { background-color: white !important; }
+        }
+      `}</style>
 
-            <div className="flex flex-col gap-12">
-                {messages.map((msg, idx) => {
-                    // Filter out user chat bubbles directly as requested
-                    if (msg.role === 'user') return null;
+            <div id="insightx-corporate-report" className="bg-white text-slate-900 mx-auto font-sans w-[794px] min-h-[1123px] p-12 box-border">
+                {/* Professional Header */}
+                <header className="flex justify-between items-end border-b-2 border-slate-300 pb-4 mb-8">
+                    <div>
+                        <h2 className="text-xl font-extrabold tracking-tight text-slate-900 uppercase">InsightX Analytics</h2>
+                        <h1 className="text-3xl font-light text-slate-500 mt-1">Executive Transaction Briefing</h1>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm font-medium text-slate-500">{date}</p>
+                    </div>
+                </header>
 
-                    // Find the preceding user question to use as the section header
-                    let userQuestion = "Insight";
-                    for (let i = idx - 1; i >= 0; i--) {
-                        if (messages[i].role === 'user') {
-                            userQuestion = messages[i].content;
-                            break;
-                        }
-                    }
+                {/* Section 1: Top-Level KPIs */}
+                {kpiMessages.length > 0 && (
+                    <div className="flex flex-wrap gap-4 mb-10">
+                        {kpiMessages.map(item => {
+                            const row = item.chartData[0];
+                            const keys = Object.keys(row);
+                            const valKey = item.resolvedY || keys[keys.length - 1];
+                            const val = row[valKey];
+                            const displayVal = typeof val === "number" && (valKey.includes("amount") || valKey.includes("balance") || valKey.includes("inr"))
+                                ? `₹${val.toLocaleString("en-IN")}`
+                                : val;
+                            const label = valKey.replace(/_/g, " ");
 
-                    // Strip mic icon if present
-                    if (userQuestion.startsWith('🎤 "')) {
-                        userQuestion = userQuestion.replace('🎤 "', '').replace('"', '');
-                    }
-
-                    const { data } = msg;
-                    if (!data) return null;
-
-                    const chartType = data.chartType;
-                    const chartData = data.rawData || [];
-
-                    let resolvedX = data.xAxis;
-                    let resolvedY = data.yAxis;
-
-                    const isChartType = chartType === "bar" || chartType === "line" || chartType === "pie";
-
-                    if (isChartType && chartData.length > 0) {
-                        const dataKeys = Object.keys(chartData[0]);
-                        if ((!resolvedX || !resolvedY) && dataKeys.length >= 2) {
-                            if (!resolvedX) resolvedX = dataKeys[0];
-                            if (!resolvedY) {
-                                const numericKey = dataKeys.find((k) => k !== resolvedX && typeof chartData[0][k] === "number");
-                                resolvedY = numericKey ?? dataKeys[1];
-                            }
-                        }
-                    }
-
-                    const isKpi = chartType === "kpi" || (chartType !== "text" && chartData.length === 1 && !isChartType);
-
-                    return (
-                        <div key={msg.id} className="print-avoid-break">
-                            <h3 className="text-lg font-bold text-violet-700 mt-8 mb-4">{userQuestion}</h3>
-
-                            <p className="text-slate-700 mb-6 leading-relaxed whitespace-pre-wrap">
-                                {msg.content || data.summary}
-                            </p>
-
-                            {isKpi && chartData.length > 0 && (
-                                <div className="flex flex-col items-center justify-center p-8 border border-slate-200 rounded-xl bg-slate-50 mb-8 mx-auto w-1/2 shadow-sm">
-                                    <span className="text-5xl font-extrabold text-[#0f172a] mb-2">
-                                        {(() => {
-                                            const row = chartData[0];
-                                            const keys = Object.keys(row);
-                                            const valKey = resolvedY || keys[keys.length - 1];
-                                            const val = row[valKey];
-                                            return typeof val === "number" && (valKey.includes("amount") || valKey.includes("balance") || valKey.includes("inr"))
-                                                ? `₹${val.toLocaleString("en-IN")}`
-                                                : val;
-                                        })()}
-                                    </span>
-                                    <span className="text-sm font-medium text-slate-500 uppercase tracking-wider text-center">
-                                        {(() => {
-                                            const row = chartData[0];
-                                            const keys = Object.keys(row);
-                                            const valKey = resolvedY || keys[keys.length - 1];
-                                            return valKey.replace(/_/g, " ");
-                                        })()}
-                                    </span>
+                            return (
+                                <div key={item.id} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-5 border-l-4 border-l-violet-600 print-avoid-break">
+                                    <div className="text-3xl font-bold text-slate-800">{displayVal}</div>
+                                    <div className="text-xs uppercase text-slate-500 mt-1 font-semibold tracking-wider">{label}</div>
+                                    {item.summary && item.summary !== displayVal?.toString() && (
+                                        <p className="text-[10px] text-slate-400 mt-2 leading-tight">{item.summary}</p>
+                                    )}
                                 </div>
-                            )}
+                            );
+                        })}
+                    </div>
+                )}
 
-                            {isChartType && resolvedX && resolvedY && chartData.length > 1 && (
-                                <div className="flex justify-center my-6">
-                                    {chartType === "bar" && (
-                                        <BarChart width={700} height={350} data={chartData} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                            <XAxis dataKey={resolvedX} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
-                                            <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} tickFormatter={(v) => v.toLocaleString("en-IN")} />
-                                            <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(val) => [Number(val).toLocaleString("en-IN"), resolvedY!.replace(/_/g, " ")]} />
-                                            <Legend wrapperStyle={{ color: '#475569', fontSize: 13, paddingTop: 10 }} />
-                                            <Bar dataKey={resolvedY} fill="#4f46e5" radius={[4, 4, 0, 0]} name={resolvedY.replace(/_/g, " ")} />
-                                        </BarChart>
-                                    )}
-                                    {chartType === "line" && (
-                                        <LineChart width={700} height={350} data={chartData} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                            <XAxis dataKey={resolvedX} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
-                                            <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} tickFormatter={(v) => v.toLocaleString("en-IN")} />
-                                            <Tooltip formatter={(val) => [Number(val).toLocaleString("en-IN"), resolvedY!.replace(/_/g, " ")]} />
-                                            <Legend wrapperStyle={{ color: '#475569', fontSize: 13, paddingTop: 10 }} />
-                                            <Line type="monotone" dataKey={resolvedY} stroke="#4f46e5" strokeWidth={3} dot={{ fill: '#4f46e5', r: 4, strokeWidth: 0 }} activeDot={{ r: 6, stroke: "#fff", strokeWidth: 2 }} name={resolvedY.replace(/_/g, " ")} />
-                                        </LineChart>
-                                    )}
-                                    {chartType === "pie" && (
-                                        <PieChart width={700} height={350}>
+                {/* Section 2: Grid Insights (Pie/Line) */}
+                {gridCharts.length > 0 && (
+                    <div className="grid grid-cols-2 gap-8 mb-10">
+                        {gridCharts.map(item => (
+                            <div key={item.id} className="print-avoid-break">
+                                <h3 className="text-sm font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">{item.userQuestion}</h3>
+
+                                <div className="flex justify-center items-center h-[200px]">
+                                    {item.chartType === 'pie' && (
+                                        <PieChart width={300} height={200}>
                                             <Pie
-                                                data={chartData} cx="50%" cy="50%" innerRadius={80} outerRadius={130}
-                                                dataKey={resolvedY} nameKey={resolvedX} stroke="none"
-                                                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
-                                                labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                                                data={item.chartData} cx="50%" cy="50%" innerRadius={40} outerRadius={80}
+                                                dataKey={item.resolvedY} nameKey={item.resolvedX} stroke="none"
                                             >
-                                                {chartData.map((_, i) => (
+                                                {item.chartData.map((_, i) => (
                                                     <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
                                                 ))}
                                             </Pie>
-                                            <Tooltip formatter={(val) => [Number(val).toLocaleString("en-IN"), resolvedY!.replace(/_/g, " ")]} />
-                                            <Legend wrapperStyle={{ color: '#475569', fontSize: 13, paddingTop: 10 }} />
+                                            <Tooltip formatter={(val) => [Number(val).toLocaleString("en-IN"), item.resolvedY!.replace(/_/g, " ")]} />
+                                            <Legend wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
                                         </PieChart>
                                     )}
+
+                                    {item.chartType === 'line' && (
+                                        <LineChart width={320} height={200} data={item.chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                            <XAxis dataKey={item.resolvedX} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v.toLocaleString("en-IN")} width={40} />
+                                            <Tooltip formatter={(val) => [Number(val).toLocaleString("en-IN"), item.resolvedY!.replace(/_/g, " ")]} />
+                                            <Line type="monotone" dataKey={item.resolvedY} stroke="#4f46e5" strokeWidth={2} dot={{ r: 2, fill: '#4f46e5' }} />
+                                        </LineChart>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    );
-                })}
+
+                                <p className="text-xs text-slate-600 leading-relaxed text-justify mt-4">
+                                    {item.summary}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Section 3: Deep Dives (Bar/Table) */}
+                {fullWidthCharts.length > 0 && (
+                    <div className="flex flex-col gap-10">
+                        {fullWidthCharts.map(item => (
+                            <div key={item.id} className="print-avoid-break">
+                                <h3 className="text-sm font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">{item.userQuestion}</h3>
+
+                                {item.chartType === 'bar' && item.resolvedX && item.resolvedY && (
+                                    <div className="flex justify-center mb-4">
+                                        <BarChart width={680} height={250} data={item.chartData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                            <XAxis dataKey={item.resolvedX} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => v.toLocaleString("en-IN")} />
+                                            <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(val) => [Number(val).toLocaleString("en-IN"), item.resolvedY!.replace(/_/g, " ")]} />
+                                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                                            <Bar dataKey={item.resolvedY} fill="#4f46e5" radius={[2, 2, 0, 0]} name={item.resolvedY.replace(/_/g, " ")} maxBarSize={50} />
+                                        </BarChart>
+                                    </div>
+                                )}
+
+                                {item.chartType === 'table' && (
+                                    <div className="mb-4 overflow-hidden rounded-md border border-slate-200">
+                                        <table className="w-full text-left text-xs text-slate-600">
+                                            <thead className="bg-slate-50 text-slate-800 font-semibold border-b border-slate-200 uppercase tracking-wide">
+                                                <tr>
+                                                    {Object.keys(item.chartData[0] || {}).map((key) => (
+                                                        <th key={key} className="px-3 py-2">{key.replace(/_/g, " ")}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {item.chartData.slice(0, 8).map((row: any, i: number) => (
+                                                    <tr key={i} className="hover:bg-slate-50">
+                                                        {Object.values(row).map((val: any, j: number) => (
+                                                            <td key={j} className="px-3 py-2">
+                                                                {typeof val === 'number' ? val.toLocaleString("en-IN") : String(val)}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        {item.chartData.length > 8 && (
+                                            <div className="bg-slate-50 px-3 py-1.5 text-[10px] text-slate-400 text-center border-t border-slate-100">
+                                                Showing top 8 corresponding rows.
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="bg-violet-50 text-violet-900 text-xs p-4 rounded-md mt-4 border border-violet-100 shadow-sm">
+                                    <span className="font-semibold block mb-1">Executive Summary:</span>
+                                    {item.summary}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
-        </div>
+        </>
     );
 };
