@@ -175,24 +175,29 @@ The database returned this exact data:
 {schema}
 --- END SCHEMA ---
 
-Task 1: Write a concise executive summary (2-3 sentences) of the data above.
-Highlight the single most important business finding. Use \u20b9 for INR values.
+Task 1: Write a concise, highly professional executive summary (2-3 sentences). Include rupee symbols (₹).
 
-Task 2: Suggest exactly 3 follow-up questions. STRICT RULES:
+Task 2: Suggest exactly 3 logical follow-up questions. STRICT RULES:
 - Every question MUST be answerable using only the columns and values listed in the schema.
 - Reference real column names and real values (e.g. sender_bank = 'HDFC', transaction_type = 'P2P').
 - Do NOT invent columns, tables, or data that are not in the schema.
 - Questions should be a natural, different-angle continuation of the current analysis.
 
-Task 3: Decide the best way to visualize this data. Choose ONE chart type:
-- "bar" for comparing categories (e.g. banks, transaction types)
-- "line" for time series or trends over ordered values
-- "pie" for showing proportions or distributions of a whole
-- "kpi" for a single numeric result (e.g. total count, average)
-- "table" for complex multi-column data or raw listings
-Provide the column name to use for the X-axis (or label) and the column name for the Y-axis (or value). Use null if not applicable.
+Task 3: Decide the best way to visualize this data. Choose ONE chart type: "bar", "line", "pie", "kpi", or "table".
+STRICT RULES FOR CHARTS:
+- If the user's question contains words like "distribution", "breakdown", "share", or "percentage", you MUST output "pie".
+- If the data is a single number, output "kpi".
+- If the data shows a trend over time (days, hours, months), output "line".
+- If comparing categories (e.g., banks, states, network types) and it is NOT a distribution, output "bar".
+- ONLY output "table" if the data contains more than 2 columns (e.g., sender, receiver, and amount).
 
-Return valid JSON with exactly these keys: "answer" (string), "follow_up_questions" (list of 3 strings), "chart_type" (string), "x_axis" (string or null), "y_axis" (string or null)."""
+You MUST return your response as a valid JSON object.
+Use exactly these keys:
+"answer" (string),
+"follow_up_questions" (list of strings),
+"chart_type" (string: "bar", "line", "pie", "kpi", or "table"),
+"x_axis" (string: the EXACT column name from the data to use as the X-axis label/category. E.g., 'NETWORK TYPE'),
+"y_axis" (string: the EXACT column name from the data to use as the Y-axis value. E.g., 'TXN COUNT')"""
 
 
 # -- Core Endpoint: /api/ask ---------------------------------------------------
