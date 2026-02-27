@@ -184,7 +184,7 @@ const Dashboard = () => {
             const nextHistory = buildChatHistory([
               ...messages,
               userMsg,
-              { id: "tmp", role: "ai", content: res.answer, data: { type: "text", title: "", summary: res.answer } },
+              { id: "tmp", role: "ai", content: res.answer, data: { title: "", summary: res.answer, textContent: res.answer, chartType: "text", xAxis: null, yAxis: null } },
             ]);
             sendQuestion(q, nextHistory);
           },
@@ -200,7 +200,7 @@ const Dashboard = () => {
             id: (Date.now() + 1).toString(),
             role: "ai",
             content: "",
-            data: { type: "text", title: "Error", content: msg, summary: "" },
+            data: { title: "Error", textContent: msg, summary: "", chartType: "text", xAxis: null, yAxis: null },
           },
         ]);
       } finally {
