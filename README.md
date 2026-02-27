@@ -1,117 +1,113 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/InsightX-Agentic_AI_Analytics-7c3aed?style=for-the-badge" alt="InsightX" />
-</p>
+<div align="center">
+  <img src="https://img.shields.io/badge/InsightX-Agentic_AI_Analytics-7c3aed?style=for-the-badge&logoColor=white" alt="InsightX" />
 
-<h1 align="center">InsightX</h1>
+  <h1>InsightX</h1>
 
-<p align="center">
-  <b>AI-powered natural language analytics platform for Indian UPI transaction data.</b><br/>
-  Ask questions in plain English — or by voice, or image — and get instant database insights.
-</p>
+  <p>
+    <b>The Elite AI-Powered Analytics & Executive Reporting Platform for UPI Data</b><br/>
+    Ask questions in plain English, by voice, or by image upload — get instant executed SQL, dynamic visualizations, and 1-click corporate PDF reports.
+  </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/python-3.10+-blue?logo=python" />
-  <img src="https://img.shields.io/badge/node-18+-green?logo=nodedotjs" />
-  <img src="https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi" />
-  <img src="https://img.shields.io/badge/React-18-61dafb?logo=react" />
-  <img src="https://img.shields.io/badge/license-MIT-green" />
-</p>
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white" alt="Python" />
+    <img src="https://img.shields.io/badge/Node.js-18+-green?logo=nodedotjs&logoColor=white" alt="Node" />
+    <img src="https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
+    <img src="https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=black" alt="React" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white" alt="Tailwind" />
+  </p>
+</div>
 
 ---
 
-## ✨ Key Features
+## 📸 Demo Showcase
+
+> *Add high-quality screenshots or GIFs of your running application here.*
+
+<div align="center">
+  <img src="https://via.placeholder.com/800x450/0f172a/7c3aed?text=Screenshot:+Dashboard+Visualizations+(Charts,+KPIs)" alt="Dashboard Visualizations" width="48%" />
+  <img src="https://via.placeholder.com/800x450/0f172a/0ea5e9?text=Screenshot:+1-Click+Corporate+PDF+Board+Report" alt="PDF Export" width="48%" />
+</div>
+<br/>
+<div align="center">
+  <img src="https://via.placeholder.com/800x450/0f172a/10b981?text=Screenshot:+Voice+Query+&+OCR+Image+Upload" alt="Voice and OCR Input" width="48%" />
+  <img src="https://via.placeholder.com/800x450/0f172a/f59e0b?text=Screenshot:+Branded+Sidebar+&+Session+Management" alt="Sidebar and Themes" width="48%" />
+</div>
+
+---
+
+## ✨ Elite Features
 
 | Feature | Description |
 |---------|-------------|
-| 💬 **Natural Language Queries** | Ask questions in plain English — Vanna AI converts them to SQL automatically |
-| 🎤 **Voice Input** | Speak your question — local Whisper STT transcribes and queries the database |
-| 📸 **Image / OCR Input** | Upload a chart or screenshot — EasyOCR extracts text and formulates a query |
-| 🤖 **Dual-AI Pipeline** | Vanna AI (Text-to-SQL) + Groq LLaMA 3.3 70B (executive summaries & follow-ups) |
-| 📊 **Live Data Visualization** | Results displayed as interactive tables, charts, and KPI cards |
-| 🧠 **Chat Memory** | Full conversation history persisted in SQLite — survives page reloads and browser restarts |
-| 💡 **Smart Follow-ups** | AI-generated follow-up questions grounded strictly in the database schema — no hallucinated columns |
-| 🎯 **Intent Guardrail** | Groq-powered intent classification prevents Vanna from generating SQL for greetings or off-topic input |
-| 🔒 **Fully Local Processing** | Whisper, ChromaDB, EasyOCR, and SQLite all run on your machine — no data leaves your system |
-| 🗂️ **Session Management** | Create, switch, and delete chat sessions — full sidebar with real-time history |
-
----
-
-## 📸 Screenshots
-
-> *Add screenshots of your running app here.*
+| 💬 **Natural Language Queries** | Ask questions in plain English — Vanna AI converts them to SQL automatically. |
+| 📄 **1-Click Board Reports** | Click one button to export your active chat session into a clean, light-themed, professional executive **PDF document** (powered by `html2pdf.js`). |
+| 🎤 **Voice Input** | Speak your question — local Whisper STT transcribes and queries the database via microphone. |
+| 📸 **Image / OCR Input** | Upload a chart or screenshot — EasyOCR extracts text and Groq formulates a database query. |
+| 🤖 **Dual-AI Pipeline** | Vanna AI (Text-to-SQL) + Groq LLaMA 3.3 70B (executive summaries & follow-ups). |
+| 📊 **Dynamic Visualization** | The AI automatically decides the best way to visualize data: **Bar, Line, Pie, KPI, or Table**, rendered beautifully via Recharts. |
+| 🧠 **Chat Memory** | Full conversation history is persisted in SQLite — survives page reloads and browser restarts. |
+| 💡 **Smart Follow-ups** | AI-generated follow-up questions grounded strictly in the database schema — no hallucinated columns. |
+| 🎯 **Intent Guardrail** | Groq-powered intent classification prevents Vanna from generating SQL for greetings or off-topic input. |
+| 🔒 **Fully Local Processing** | Whisper, ChromaDB, EasyOCR, and SQLite all run on your machine — no data leaves your system. |
+| 🗂️ **Session Management** | Create, switch, and delete chat sessions — premium glass-morphism sidebar with real-time history. |
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        USER INPUT                                   │
-│                  Text  /  Voice  /  Image                           │
-└──────────┬──────────────────┬──────────────────┬────────────────────┘
-           │                  │                  │
-           │            ┌─────▼─────┐      ┌─────▼──────┐
-           │            │  Whisper   │      │  EasyOCR   │
-           │            │  (local)   │      │  (local)   │
-           │            └─────┬─────┘      └─────┬──────┘
-           │                  │                   │
-           │            Transcription        Raw Text
-           │                  │                   │
-           │                  │             ┌─────▼──────┐
-           │                  │             │ Groq LLM   │
-           │                  │             │ (interpret) │
-           │                  │             └─────┬──────┘
-           │                  │                   │
-           ▼                  ▼                   ▼
-     ┌─────────────────────────────────────────────────┐
-     │           Intent Guardrail (Groq)               │
-     │  Classifies: Data question? YES → Vanna         │
-     │                              NO  → Conversational│
-     └──────────────────────┬──────────────────────────┘
-                            │
-               ┌────────────▼────────────┐
-               │   Vanna AI              │
-               │   ChromaDB (vectors)    │
-               │   → SQL Generation      │
-               └────────────┬────────────┘
-                            │
-               ┌────────────▼────────────┐
-               │   SQLite Execution      │
-               │   upi_transactions.db   │
-               └────────────┬────────────┘
-                            │
-               ┌────────────▼────────────┐
-               │   Groq LLaMA 3.3 70B   │
-               │   • Executive Summary   │
-               │   • Schema-grounded     │
-               │     Follow-up Questions │
-               └────────────┬────────────┘
-                            │
-               ┌────────────▼────────────┐
-               │   Chat History DB       │
-               │   chat_history.db       │
-               │   (auto-save session)   │
-               └────────────┬────────────┘
-                            │
-               ┌────────────▼────────────┐
-               │   React Dashboard       │
-               │   Table / Chart / KPI   │
-               │   Follow-up Buttons     │
-               └─────────────────────────┘
+│                            USER INPUT                               │
+│              Text  /  Voice (Whisper)  /  Image (OCR)               │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │    Intent Guardrail       │
+                    │  (Groq Classification)    │
+                    └─────────────┬─────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │    Vanna AI Pipeline      │
+                    │  (Vector DB + Prompts)    │
+                    │    → Generates SQL        │
+                    └─────────────┬─────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │   SQLite Execution        │
+                    │  (upi_transactions.db)    │
+                    └─────────────┬─────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │  Groq (LLaMA-3 70B)       │
+                    │  • Executive Summary      │
+                    │  • Visualization Choice   │
+                    │  • Targeted Follow-ups    │
+                    └─────────────┬─────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │   Chat History DB         │
+                    │   (chat_history.db)       │
+                    └─────────────┬─────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │  React.js Dashboard       │
+                    │  • Recharts Visuals       │
+                    │  • PDF Report Generation  │
+                    └───────────────────────────┘
 ```
 
 ---
 
 ## 📂 Project Structure
 
-```
+```text
 Insightx-/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py                      # FastAPI server (10 endpoints, dual-AI pipeline)
 │   │   └── chat_db.py                   # SQLite chat history (sessions + messages CRUD)
 │   ├── scripts/
-│   │   ├── train_vanna.py               # Train Vanna on DB schema + example queries (439 lines)
+│   │   ├── train_vanna.py               # Train Vanna on DB schema + example queries
 │   │   ├── demo_vanna.py                # CLI demo for testing Vanna text-to-SQL
 │   │   ├── evaluate_vanna.py            # Accuracy evaluation harness for Vanna
 │   │   ├── speech_to_text.py            # Standalone Whisper STT utility
@@ -122,12 +118,11 @@ Insightx-/
 │   ├── data/
 │   │   ├── upi_transactions.db          # SQLite database (250,000 transactions)
 │   │   └── chat_history.db              # Chat session history (auto-created)
-│   ├── vector_store/                    # ChromaDB vector embeddings (auto-created by train_vanna.py)
+│   ├── vector_store/                    # ChromaDB vector embeddings (auto-created)
 │   ├── notebooks/                       # Jupyter notebooks for exploration
 │   ├── .env                             # Environment variables (git-ignored)
 │   ├── .env.example                     # Template for environment variables
-│   ├── requirements.txt                 # Python dependencies (19 packages)
-│   └── eval_report.json                 # Vanna evaluation results
+│   └── requirements.txt                 # Python dependencies
 │
 ├── frontend/
 │   ├── src/
@@ -135,27 +130,24 @@ Insightx-/
 │   │   ├── main.tsx                     # Vite entry point
 │   │   ├── index.css                    # Global styles (glassmorphism, animations, dark theme)
 │   │   ├── lib/
-│   │   │   └── api.ts                   # Typed API client (askQuestion, voiceAsk, ocrAsk, sessions)
+│   │   │   └── api.ts                   # Typed API client
 │   │   ├── pages/
 │   │   │   ├── Index.tsx                # Landing page
-│   │   │   ├── Dashboard.tsx            # Main chat interface (session-aware, ~340 lines)
+│   │   │   ├── Dashboard.tsx            # Main chat interface (+ dynamic PDF Export logic)
 │   │   │   └── NotFound.tsx             # 404 page
 │   │   ├── components/
-│   │   │   ├── DashboardSidebar.tsx     # Session sidebar (live API, delete, navigate)
-│   │   │   ├── ChatMessage.tsx          # Message renderer (follow-ups, SQL disclosure, export)
+│   │   │   ├── DashboardSidebar.tsx     # Branded session sidebar
+│   │   │   ├── ChatMessage.tsx          # Message renderer (follow-ups, SQL disclosure)
 │   │   │   ├── DataVisualizer.tsx       # Table / Line / Bar / Pie chart / KPI renderer
+│   │   │   ├── ReportTemplate.tsx       # Hidden light-themed corporate template for PDF export
 │   │   │   ├── NavLink.tsx              # Navigation link component
-│   │   │   └── ui/                      # 49 shadcn/ui components (button, dialog, toast, etc.)
+│   │   │   └── ui/                      # 49 shadcn/ui components
 │   │   ├── hooks/                       # Custom React hooks
 │   │   └── test/                        # Vitest test files
 │   ├── vite.config.ts                   # Dev server (port 8080, /api proxy → 8000)
-│   ├── package.json                     # Node dependencies
+│   ├── package.json                     # Node dependencies (including html2pdf.js, recharts)
 │   ├── tailwind.config.ts               # Tailwind CSS configuration
-│   ├── tsconfig.json                    # TypeScript configuration
-│   └── postcss.config.js               # PostCSS configuration
-│
-├── .gitignore                           # Git ignore rules
-├── LICENSE                              # MIT License (Copyright 2026 Atul)
+│   └── tsconfig.json                    # TypeScript configuration
 └── README.md                            # This file
 ```
 
@@ -167,9 +159,9 @@ Insightx-/
 
 - **Python 3.10+** with pip
 - **Node.js 18+** with npm
+- **FFmpeg** — required by Whisper for audio processing ([ffmpeg.org](https://ffmpeg.org))
 - **Groq API Key** — free at [console.groq.com](https://console.groq.com)
 - **Google Gemini API Key** — free at [aistudio.google.com](https://aistudio.google.com) *(only needed for training Vanna)*
-- **FFmpeg** — required by Whisper for audio processing ([ffmpeg.org](https://ffmpeg.org))
 
 ### 1. Clone the Repository
 
@@ -213,7 +205,7 @@ npm install
 npm run dev
 ```
 
-The frontend starts at **http://localhost:8080**. It automatically proxies all `/api/*` requests to the backend at `localhost:8000`.
+The frontend starts at **http://localhost:8080**. It automatically proxies all `/api/*` requests to the backend.
 
 ### 4. Open in Browser
 
@@ -228,7 +220,7 @@ Navigate to **http://localhost:8080** → Click **"Try InsightX"** → Start ask
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/ask` | Text query → Vanna SQL → Groq summary → JSON response |
-| `POST` | `/api/voice-ask` | Audio upload → Whisper transcription → full pipeline |
+| `POST` | `/api/voice-ask` | Audio upload (.webm) → Whisper transcription → full pipeline |
 | `POST` | `/api/ocr-ask` | Image upload → EasyOCR → Groq interpretation → full pipeline |
 | `POST` | `/api/transcribe` | Audio → text only (no query execution) |
 
@@ -246,53 +238,6 @@ Navigate to **http://localhost:8080** → Click **"Try InsightX"** → Start ask
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/` | Health check → `{"status": "ok"}` |
-
----
-
-### Request / Response Examples
-
-#### `POST /api/ask`
-
-**Request:**
-```json
-{
-  "question": "Which bank has the highest transaction volume?",
-  "chat_history": [
-    {"role": "user", "content": "Show total transactions"},
-    {"role": "assistant", "content": "There are 250,000 total transactions."}
-  ],
-  "session_id": "a1b2c3d4e5f6"
-}
-```
-
-**Response:**
-```json
-{
-  "question": "Which bank has the highest transaction volume?",
-  "sql": "SELECT sender_bank, COUNT(*) as txn_count FROM transactions GROUP BY sender_bank ORDER BY txn_count DESC LIMIT 1",
-  "data": [{"sender_bank": "SBI", "txn_count": 35412}],
-  "answer": "SBI leads with 35,412 transactions, accounting for 14.2% of all UPI activity.",
-  "follow_up_questions": [
-    "What is the average amount_inr for SBI transactions?",
-    "How does SBI's transaction volume compare on weekends vs weekdays?",
-    "What is the fraud_flag rate for sender_bank = 'SBI'?"
-  ]
-}
-```
-
-#### `POST /api/voice-ask`
-
-**Request:** `multipart/form-data` with `audio` field (.webm, .wav, .mp3, .ogg, .m4a)
-
-**Response:** Same as `/api/ask` + `"transcription": "which bank has the most transactions"`
-
-#### `POST /api/ocr-ask`
-
-**Request:** `multipart/form-data` with:
-- `image` — `.jpg`, `.png`, `.webp`, `.bmp`
-- `text` *(optional)* — additional context (e.g. "focus on failed transactions")
-
-**Response:** Same as `/api/ask` + `"ocr_text": "...", "original_question": "..."`
 
 ---
 
@@ -360,25 +305,24 @@ Navigate to **http://localhost:8080** → Click **"Try InsightX"** → Start ask
 | Vector Store | **ChromaDB** 0.4+ | Local vector database for Vanna's training data |
 | LLM (Runtime) | **Groq** — LLaMA 3.3 70B | SQL generation, executive summaries, follow-ups, intent classification |
 | LLM (Training) | **Google Gemini** 2.0 Flash | Used only during `train_vanna.py` |
-| Speech-to-Text | **OpenAI Whisper** (local) | Audio transcription — no API key needed |
-| OCR | **EasyOCR** 1.7+ | Image text extraction — CPU-based, no GPU required |
+| Speech-to-Text | **OpenAI Whisper** (local) | Audio transcription (coupled with **FFmpeg**) |
+| OCR | **EasyOCR** 1.7+ | Image text extraction — CPU-based |
 | Database | **SQLite** | Transaction data + chat history |
-| Data Processing | **Pandas** 2.0+, **NumPy** 1.24+ | DataFrame operations and data formatting |
+| Data Processing | **Pandas** 2.0+, **NumPy** 1.24+ | DataFrame operations and formatting |
 
 ### Frontend
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | Framework | **React 18** + **TypeScript** | Component-based UI with full type safety |
-| Build Tool | **Vite 5** | Fast HMR dev server with API proxy |
-| UI Library | **shadcn/ui** (49 components) | Radix UI primitives with Tailwind styling |
+| Build Tool | **Vite 5** | Fast HMR dev server |
+| UI Library | **shadcn/ui** | Radix UI primitives with Tailwind styling |
 | Styling | **Tailwind CSS 3.4** | Utility-first CSS with custom dark theme |
-| Charts | **Recharts** 2.15 | Line, bar, and pie chart visualizations |
-| Animations | **Framer Motion** 12 | Page transitions, message animations, loading states |
-| Icons | **Lucide React** | 1000+ SVG icons |
-| Routing | **React Router 6** | Client-side routing with session URL params |
-| State | **TanStack React Query** | Server state management |
-| Notifications | **Sonner** | Toast notifications |
+| Charts | **Recharts** 2.15 | Responsive Line, Bar, and Pie chart visualizations |
+| Reports | **html2pdf.js** | 1-Click Executive Corporate PDF Generation |
+| Animations | **Framer Motion** 12 | Fluid transitions, message animations, waveforms |
+| Icons | **Lucide React** | Beautiful SVG icons |
+| Routing | **React Router 6** | Client-side routing with session capability |
 
 ---
 
@@ -405,129 +349,18 @@ GEMINI_MODEL=gemini-2.0-flash             # Default Gemini model (training only)
 WHISPER_MODEL=base                         # Larger = more accurate but slower
 ```
 
-### Where to Get API Keys
-
-| Key | URL | Free Tier |
-|-----|-----|-----------|
-| Groq API Key | [console.groq.com](https://console.groq.com) | ✅ Free (rate-limited) |
-| Gemini API Key | [aistudio.google.com](https://aistudio.google.com) | ✅ Free |
-
 ---
 
-## 🧪 Scripts Reference
+## 📋 Example Queries to Try
 
-All scripts are in `backend/scripts/` and should be run from the `backend/` directory.
+Once the app is running, try asking:
 
-| Script | Command | Description |
-|--------|---------|-------------|
-| `train_vanna.py` | `python scripts/train_vanna.py` | Trains Vanna AI on the DB schema, column descriptions, and 100+ example question-SQL pairs. **Run once after setup.** |
-| `demo_vanna.py` | `python scripts/demo_vanna.py` | Interactive CLI to test Vanna text-to-SQL without the web UI |
-| `evaluate_vanna.py` | `python scripts/evaluate_vanna.py` | Runs an evaluation suite against Vanna and generates `eval_report.json` |
-| `speech_to_text.py` | `python scripts/speech_to_text.py` | Standalone Whisper transcription utility |
-| `ocr_easyocr.py` | *(imported by main.py)* | EasyOCR text extraction module |
+1. *"What is the distribution of transactions by network type?"* (Will automatically render a **Pie Chart**)
+2. *"Show me the total transaction count over the last 7 days."* (Will automatically render a **Line Chart**)
+3. *"Which top 5 states have the highest transaction volume?"* (Will automatically render a **Bar Chart**)
+4. *"What is the overall total transaction amount?"* (Will automatically render a **KPI Card**)
 
----
-
-## 🖥️ Frontend Components
-
-| Component | File | Description |
-|-----------|------|-------------|
-| **Dashboard** | `pages/Dashboard.tsx` | Main chat interface — session-aware, loads messages from DB, auto-creates sessions, sends `session_id` with every query |
-| **DashboardSidebar** | `components/DashboardSidebar.tsx` | Left sidebar — fetches real sessions from API, click to switch, hover to delete, shows relative timestamps |
-| **ChatMessage** | `components/ChatMessage.tsx` | Renders user/AI messages — includes follow-up buttons, SQL disclosure (collapsible), and JSON export |
-| **DataVisualizer** | `components/DataVisualizer.tsx` | Renders data as tables (with ₹ formatting), line/bar/pie charts (Recharts), or KPI cards |
-| **Landing Page** | `pages/Index.tsx` | Hero page with feature highlights and CTA to Dashboard |
-
----
-
-## 🧠 How It Works
-
-### 1. User Sends a Query
-The user types a question, records voice, or uploads an image via the React dashboard.
-
-### 2. Input Processing
-- **Text** → sent directly to the pipeline
-- **Voice** → Whisper (local) transcribes to text → sent to pipeline
-- **Image** → EasyOCR extracts text → Groq interprets and formulates a database question → sent to pipeline
-
-### 3. Intent Classification
-Groq classifies whether the input is a data question (`YES`) or conversational (`NO`).
-- **YES** → proceeds to Vanna AI for SQL generation
-- **NO** → returns a friendly conversational reply with chat history context
-
-### 4. SQL Generation & Execution
-Vanna AI uses ChromaDB vector similarity to find relevant training examples, then generates SQL. The SQL is executed against the local SQLite database.
-
-### 5. Synthesis
-The query results are sent to Groq LLaMA 3.3 70B with:
-- The full database schema
-- The user's chat history (last 3 turns)
-- Strict rules for follow-up question generation
-
-Groq returns a JSON with an executive summary and 3 schema-grounded follow-up questions.
-
-### 6. Persistence
-If a `session_id` is provided, both the user question and AI response are saved to `chat_history.db`. The session title is auto-set from the first question.
-
-### 7. Display
-The React dashboard renders the response as a table/chart with the executive summary, follow-up buttons, and collapsible SQL disclosure.
-
----
-
-## 📋 Example Queries
-
-Here are some questions you can ask InsightX:
-
-```
-Show total UPI transaction volume
-Which bank has the most transactions?
-Top 5 transactions by amount
-What is the fraud rate by transaction type?
-Show spending trends by day of week
-Which age group uses P2P transfers most?
-Average transaction amount for each merchant category
-How many failed transactions happened on weekends?
-What is the distribution of transactions by network type?
-Compare SBI vs HDFC transaction volumes
-Which state has the highest average transaction amount?
-Show hourly transaction pattern for Sundays
-```
-
----
-
-## 🔧 Development
-
-### Running Tests
-
-```bash
-# Frontend unit tests
-cd frontend
-npm test
-
-# Frontend test watch mode
-npm run test:watch
-
-# Backend evaluation
-cd backend
-python scripts/evaluate_vanna.py
-```
-
-### Building for Production
-
-```bash
-# Frontend production build
-cd frontend
-npm run build
-
-# Output → frontend/dist/
-```
-
-### Linting
-
-```bash
-cd frontend
-npm run lint
-```
+*(After asking, click the **Export Board Report** button in the header to download the entire session as a polished Corporate PDF document!)*
 
 ---
 
@@ -536,12 +369,12 @@ npm run lint
 | Issue | Solution |
 |-------|----------|
 | `GROQ_API_KEY not found` | Create `backend/.env` with your API key (see `.env.example`) |
-| `ModuleNotFoundError: whisper` | Install with `pip install openai-whisper` and ensure FFmpeg is in PATH |
-| `database is locked` | Ensure only one instance of the backend is running |
-| `Vanna generates wrong SQL` | Re-run `python scripts/train_vanna.py` to retrain with more examples |
-| Frontend shows `502 Bad Gateway` | Ensure the backend is running on port 8000 |
-| `EasyOCR init failed` | Install with `pip install easyocr` — first run downloads ~100MB model |
-| CORS errors in browser | The Vite proxy handles this automatically — ensure you're accessing `localhost:8080`, not `8000` |
+| `ModuleNotFoundError: whisper` | Install with `pip install openai-whisper` and ensure **FFmpeg** is in PATH |
+| `[WinError 2] The system cannot find the file specified` | **FFmpeg is missing**. Whisper requires it to decode WebM audio from browsers. Install via `winget install Gyan.FFmpeg` or conda. |
+| `database is locked` | Ensure only one instance of the backend is running. |
+| `Vanna generates wrong SQL` | Re-run `python scripts/train_vanna.py` to retrain with more examples. |
+| Frontend shows `502 Bad Gateway` | Ensure the backend is running on port 8000. |
+| `EasyOCR init failed` | Install with `pip install easyocr` — first run downloads a ~100MB model. |
 
 ---
 
@@ -562,3 +395,4 @@ Copyright (c) 2026 Atul
 - [ChromaDB](https://www.trychroma.com) — Vector database
 - [shadcn/ui](https://ui.shadcn.com) — React component library
 - [Recharts](https://recharts.org) — Chart library
+- [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/) — Client-side PDF generation
